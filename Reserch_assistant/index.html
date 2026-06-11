@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能研究助手</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 marked.js 用于渲染 Markdown 报告 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #e6f7ff 0%, #b3e0ff 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-header i {
+            font-size: 1.5rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9fbfd;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 90%;
+            padding: 16px 20px;
+            border-radius: 16px;
+            line-height: 1.6;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai-message {
+            background: white;
+            color: #333;
+            align-self: flex-start;
+            border: 1px solid #e8f0fe;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            width: 100%; /* 报告通常较长，占满容器宽度 */
+        }
+
+        .message-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* 报告内容样式（Markdown 渲染后） */
+        .report-body h1, .report-body h2, .report-body h3 {
+            color: #1677ff;
+            margin: 16px 0 8px;
+        }
+        .report-body h1 { font-size: 1.5rem; border-bottom: 2px solid #e8f0fe; padding-bottom: 6px; }
+        .report-body h2 { font-size: 1.2rem; }
+        .report-body h3 { font-size: 1rem; }
+        .report-body p { margin: 8px 0; }
+        .report-body ul, .report-body ol { margin: 8px 0 8px 20px; }
+        .report-body blockquote {
+            border-left: 4px solid #1677ff;
+            padding-left: 16px;
+            color: #555;
+            margin: 12px 0;
+        }
+        .report-body code {
+            background: #f0f7ff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .report-body pre {
+            background: #f0f7ff;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        .report-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+        }
+        .report-body th, .report-body td {
+            border: 1px solid #e8f0fe;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .report-body th {
+            background: #f0f7ff;
+            color: #1677ff;
+        }
+
+        /* 元信息区域 */
+        .meta-info {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #e8f0fe;
+            font-size: 0.85rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .meta-item {
+            background: #f0f7ff;
+            padding: 4px 12px;
+            border-radius: 12px;
+            color: #1677ff;
+            font-weight: 500;
+        }
+
+        .score-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .score-high { background: #d9f7be; color: #52c41a; }
+        .score-medium { background: #fff7e6; color: #fa8c16; }
+        .score-low { background: #fff1f0; color: #ff4d4f; }
+
+        .chat-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e8f0fe;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+            background: #f9fbfd;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+        }
+
+        #message-input {
+            flex: 1;
+            border: none;
+            padding: 14px 18px;
+            font-size: 1rem;
+            outline: none;
+            resize: none;
+            background: transparent;
+            color: #333;
+        }
+
+        #message-input::placeholder { color: #999; }
+        #message-input:focus { box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2); }
+
+        .send-btn {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            border: none;
+            width: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            border-radius: 16px;
+        }
+
+        .send-btn:hover {
+            background: linear-gradient(135deg, #0958d9 0%, #003eb3 100%);
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 10px;
+            color: #1677ff;
+            font-size: 0.9rem;
+        }
+
+        .spinner {
+            border: 2px solid rgba(22, 119, 255, 0.3);
+            border-top: 2px solid #1677ff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .welcome-icon {
+            font-size: 3.5rem;
+            color: #1677ff;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .welcome-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1677ff;
+            margin-bottom: 12px;
+        }
+
+        .welcome-text {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .status-bar {
+            background: #f0f7ff;
+            padding: 8px 15px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #666;
+            border-top: 1px solid #e8f0fe;
+        }
+
+        .status-connected { color: #52c41a; }
+        .status-disconnected { color: #ff4d4f; }
+
+        .chat-messages::-webkit-scrollbar { width: 8px; }
+        .chat-messages::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #1677ff; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: #0958d9; }
+
+        @media (max-width: 768px) {
+            .chat-container { height: 90vh; max-width: 100%; border-radius: 16px; }
+            .message { max-width: 95%; }
+            .chat-header { font-size: 1.1rem; padding: 15px; }
+            .welcome-icon { font-size: 2.5rem; }
+            .welcome-title { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <i class="fas fa-microscope"></i>
+            <span>智能研究助手</span>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="welcome-message">
+                <div class="welcome-icon"><i class="fas fa-robot"></i></div>
+                <h2 class="welcome-title">欢迎使用智能研究助手</h2>
+                <p class="welcome-text">
+                    基于 LangGraph 的多阶段研究流程，自动完成规划、信息收集、分析、综合、质量检查。<br>
+                    请输入您感兴趣的研究主题，我将生成一份完整的研究报告。
+                </p>
+                <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
+                    后端地址: <code>http://localhost:8000</code>
+                </p>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <div class="chat-input">
+                <textarea id="message-input" placeholder="请输入研究主题，例如：人工智能在医疗诊断中的应用" rows="1"></textarea>
+                <button class="send-btn" id="send-message" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="loading-indicator" id="loading-indicator" style="display: none;">
+                <div class="spinner"></div>
+                <div>AI 正在生成研究报告，请耐心等待...</div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="api-status">API状态: <span class="status-disconnected">未连接</span></span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== 配置 ====================
+            const API_BASE_URL = 'http://localhost:8000';
+            const chatMessages = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const sendMessageBtn = document.getElementById('send-message');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const apiStatusEl = document.getElementById('api-status');
+
+            let isLoading = false;
+
+            // ==================== 安全转义函数（XSS 防护） ====================
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ==================== UI 工具函数 ====================
+            function showLoading() {
+                isLoading = true;
+                loadingIndicator.style.display = 'block';
+                sendMessageBtn.disabled = true;
+                messageInput.disabled = true;
+            }
+
+            function hideLoading() {
+                isLoading = false;
+                loadingIndicator.style.display = 'none';
+                sendMessageBtn.disabled = false;
+                messageInput.disabled = false;
+            }
+
+            function removeWelcomeIfPresent() {
+                const welcome = document.querySelector('.welcome-message');
+                if (welcome) welcome.remove();
+            }
+
+            function getScoreClass(score) {
+                // 质量评分 0-10，转成 0-1 区间判断
+                const normalized = score / 10;
+                if (normalized >= 0.8) return 'score-high';
+                if (normalized >= 0.6) return 'score-medium';
+                return 'score-low';
+            }
+
+            function addMessage(content, isUser = false, meta = {}) {
+                removeWelcomeIfPresent();
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+
+                if (isUser) {
+                    messageDiv.innerHTML = `<div class="message-content">${escapeHtml(content)}</div>`;
+                } else {
+                    // AI 消息：研究报告内容
+                    let reportHtml = '';
+                    try {
+                        // 使用 marked 渲染 Markdown 为 HTML（marked 默认会转义 HTML 标签，安全）
+                        reportHtml = marked.parse(content);
+                    } catch (e) {
+                        // 如果渲染失败，回退到转义文本
+                        reportHtml = `<pre>${escapeHtml(content)}</pre>`;
+                    }
+
+                    // 构建元信息栏（研究统计）
+                    let metaHtml = '';
+                    if (meta.title || meta.quality_score !== undefined) {
+                        let items = [];
+                        if (meta.title) {
+                            items.push(`<span class="meta-item">📄 ${escapeHtml(meta.title)}</span>`);
+                        }
+                        if (meta.quality_score !== undefined) {
+                            const scoreClass = getScoreClass(meta.quality_score);
+                            items.push(`<span class="score-badge ${scoreClass}">⭐ 质量：${meta.quality_score.toFixed(1)}/10</span>`);
+                        }
+                        if (meta.iteration_count !== undefined) {
+                            items.push(`<span class="meta-item">🔄 迭代：${meta.iteration_count} 次</span>`);
+                        }
+                        if (meta.search_results_count !== undefined) {
+                            items.push(`<span class="meta-item">📚 资料：${meta.search_results_count} 条</span>`);
+                        }
+                        if (meta.citation_count !== undefined) {
+                            items.push(`<span class="meta-item">🔗 引用：${meta.citation_count} 篇</span>`);
+                        }
+                        if (items.length) {
+                            metaHtml = `<div class="meta-info">${items.join('')}</div>`;
+                        }
+                    }
+
+                    messageDiv.innerHTML = `
+                        <div class="report-body">${reportHtml}</div>
+                        ${metaHtml}
+                    `;
+                }
+
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message ai-message';
+                errorDiv.innerHTML = `<div class="message-content" style="color: #ff4d4f;">❌ ${escapeHtml(message)}</div>`;
+                chatMessages.appendChild(errorDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // ==================== API 调用 ====================
+            async function checkApiConnection() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/health`);
+                    if (response.ok) {
+                        apiStatusEl.innerHTML = 'API状态: <span class="status-connected">已连接</span>';
+                        return true;
+                    } else {
+                        apiStatusEl.innerHTML = 'API状态: <span class="status-disconnected">连接失败</span>';
+                        return false;
+                    }
+                } catch (error) {
+                    apiStatusEl.innerHTML = 'API状态: <span class="status-disconnected">连接失败</span>';
+                    console.error('API 连接失败:', error);
+                    return false;
+                }
+            }
+
+            async function sendQuery() {
+                const topic = messageInput.value.trim();
+                if (!topic || isLoading) return;
+
+                addMessage(topic, true);
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                showLoading();
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/research`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topic: topic })
+                    });
+
+                    if (!response.ok) {
+                        let detail = `服务器错误 (${response.status})`;
+                        try {
+                            const errorData = await response.json();
+                            detail = errorData.detail || detail;
+                        } catch (_) { /* 忽略 */ }
+                        throw new Error(detail);
+                    }
+
+                    const data = await response.json();
+
+                    // 构造元数据对象
+                    const meta = {
+                        title: data.title,
+                        quality_score: data.quality_score,
+                        iteration_count: data.iteration_count,
+                        search_results_count: data.search_results_count,
+                        citation_count: data.citations ? data.citations.length : 0
+                    };
+
+                    // 展示报告
+                    addMessage(data.report, false, meta);
+                } catch (error) {
+                    showError(`请求失败: ${error.message}`);
+                    console.error('研究请求错误:', error);
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // ==================== 事件绑定 ====================
+            document.addEventListener('DOMContentLoaded', async () => {
+                await checkApiConnection();
+
+                sendMessageBtn.addEventListener('click', sendQuery);
+
+                messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendQuery();
+                    }
+                });
+
+                messageInput.addEventListener('input', () => {
+                    messageInput.style.height = 'auto';
+                    messageInput.style.height = messageInput.scrollHeight + 'px';
+                    sendMessageBtn.disabled = messageInput.value.trim() === '';
+                });
+
+                // 定期检测 API 状态（每 30 秒）
+                setInterval(checkApiConnection, 30000);
+
+                setTimeout(() => messageInput.focus(), 300);
+            });
+        })();
+    </script>
+</body>
+</html>
