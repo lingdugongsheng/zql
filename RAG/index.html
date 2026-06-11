@@ -1,0 +1,882 @@
+"""
+RAG 问答系统 - FastAPI 后端
+重新设计版本：更合理的端点、并发保护、清晰的配置管理
+改进版：修正 CORS 警告、安全的历史恢复、健壮的异常处理
+"""
+
+import os
+import logging
+import time
+import threading
+from typing import List, Dict, Optional, Any
+from contextlib import asynccontextmanager
+
+import dotenv
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# 导入 RAG 系统核心类（请确保 rag_system 模块已实现）
+from rag_system import RAGChain, RAGConfig, SAMPLE_DOCUMENTS
+
+# ==================== 配置加载 ====================
+dotenv.load_dotenv()
+PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIRECTORY", None)
+
+# ==================== 日志配置 ====================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ==================== 全局状态与并发保护 ====================
+rag_lock = threading.Lock()
+rag_system: Optional[RAGChain] = None
+rag_config = RAGConfig()
+
+stats: Dict[str, Any] = {
+    "total_queries": 0,
+    "total_documents": 0,
+    "last_query_time": None,
+    "confidences": []          # 最多保存 100 条置信度数据
+}
+
+# ==================== 应用生命周期 ====================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """管理应用启动与关闭"""
+    global rag_system
+    logger.info("RAG 问答系统 API 启动中...")
+    try:
+        rag_system = RAGChain(config=rag_config, persist_directory=PERSIST_DIRECTORY)
+        logger.info("RAG 系统实例已创建（未自动索引文档）")
+    except Exception as e:
+        logger.error(f"系统初始化失败: {e}")<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG智能问答</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #e6f7ff 0%, #b3e0ff 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-header i {
+            font-size: 1.5rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9fbfd;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            line-height: 1.6;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai-message {
+            background: white;
+            color: #333;
+            align-self: flex-start;
+            border: 1px solid #e8f0fe;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .message-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .sources {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #e8f0fe;
+            font-size: 0.85rem;
+        }
+
+        .source-item {
+            background: #f0f7ff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin: 6px 0;
+            border-left: 3px solid #1677ff;
+        }
+
+        .source-title {
+            font-weight: 600;
+            color: #1677ff;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .source-content {
+            color: #666;
+            font-size: 0.85rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+     
+            -webkit-box-orient: vertical;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .confidence-high {
+            background: #d9f7be;
+            color: #52c41a;
+        }
+
+        .confidence-medium {
+            background: #fff7e6;
+            color: #fa8c16;
+        }
+
+        .confidence-low {
+            background: #fff1f0;
+            color: #ff4d4f;
+        }
+
+        .chat-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e8f0fe;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+            background: #f9fbfd;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+        }
+
+        #message-input {
+            flex: 1;
+            border: none;
+            padding: 14px 18px;
+            font-size: 1rem;
+            outline: none;
+            resize: none;
+            background: transparent;
+            color: #333;
+        }
+
+        #message-input::placeholder {
+            color: #999;
+        }
+
+        #message-input:focus {
+            box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            color: white;
+            border: none;
+            width: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            border-radius: 16px;
+        }
+
+        .send-btn:hover {
+            background: linear-gradient(135deg, #0958d9 0%, #003eb3 100%);
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading-indicator {
+            text-align: center;
+            padding: 10px;
+            color: #1677ff;
+            font-size: 0.9rem;
+        }
+
+        .spinner {
+            border: 2px solid rgba(22, 119, 255, 0.3);
+            border-top: 2px solid #1677ff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .welcome-icon {
+            font-size: 3.5rem;
+            color: #1677ff;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .welcome-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1677ff;
+            margin-bottom: 12px;
+        }
+
+        .welcome-text {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .status-bar {
+            background: #f0f7ff;
+            padding: 8px 15px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #666;
+            border-top: 1px solid #e8f0fe;
+        }
+
+        .status-connected {
+            color: #52c41a;
+        }
+
+        .status-disconnected {
+            color: #ff4d4f;
+        }
+
+        /* 滚动条样式 */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #1677ff;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #0958d9;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chat-container {
+                height: 90vh;
+                max-width: 100%;
+                border-radius: 16px;
+            }
+
+            .message {
+                max-width: 95%;
+            }
+
+            .chat-header {
+                font-size: 1.1rem;
+                padding: 15px;
+            }
+
+            .welcome-icon {
+                font-size: 2.5rem;
+            }
+
+            .welcome-title {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <i class="fas fa-brain"></i>
+            <span>RAG 智能问答系统</span>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="welcome-message">
+                <div class="welcome-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h2 class="welcome-title">欢迎使用 RAG 智能问答</h2>
+                <p class="welcome-text">
+                    这是一个基于 LangChain 和 LangGraph 的智能问答系统。<br>
+                    请直接输入您的问题，系统将基于知识库为您提供准确答案。
+                </p>
+                <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
+                    后端地址: <code>http://localhost:8000</code>
+                </p>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <div class="chat-input">
+                <textarea id="message-input"
+                          placeholder="请输入您的问题... "
+                          rows="1"></textarea>
+                <button class="send-btn" id="send-message" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="loading-indicator" id="loading-indicator" style="display: none;">
+                <div class="spinner"></div>
+                <div>AI 正在思考中...</div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="api-status">API状态: <span class="status-disconnected">未连接</span></span>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 配置 ====================
+        const API_BASE_URL = 'http://localhost:8000';
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendMessageBtn = document.getElementById('send-message');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const apiStatusEl = document.getElementById('api-status');
+
+        let isLoading = false;
+
+        // ==================== 工具函数 ====================
+
+        function showLoading() {
+            isLoading = true;
+            loadingIndicator.style.display = 'block';
+            sendMessageBtn.disabled = true;
+            messageInput.disabled = true;
+        }
+
+        function hideLoading() {
+            isLoading = false;
+            loadingIndicator.style.display = 'none';
+            sendMessageBtn.disabled = false;
+            messageInput.disabled = false;
+        }
+
+        function addMessage(content, isUser = false, sources = [], confidence = 0) {
+            // 移除欢迎消息（如果是第一条消息）
+            if (chatMessages.children.length === 1 &&
+                chatMessages.firstElementChild.classList.contains('welcome-message')) {
+                chatMessages.innerHTML = '';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+
+            if (!isUser) {
+                // AI 消息
+                messageDiv.innerHTML = `
+                    <div class="message-content">${content.replace(/\n/g, '<br>')}</div>
+                    ${sources.length > 0 || confidence > 0 ? `
+                        <div class="sources">
+                            ${confidence > 0 ? `
+                                <span class="confidence-badge ${getConfidenceClass(confidence)}">
+                                    置信度: ${(confidence * 100).toFixed(0)}%
+                                </span>
+                            ` : ''}
+                            ${sources.map((source, index) => `
+                                <div class="source-item">
+                                    <div class="source-title">来源 [${index + 1}] ${source.source || 'unknown'}</div>
+                                    <div class="source-content">${source.content_preview || source.text || ''}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                `;
+            } else {
+                // 用户消息
+                messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+            }
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 0.8) return 'confidence-high';
+            if (confidence >= 0.6) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'message ai-message';
+            errorDiv.innerHTML = `<div class="message-content" style="color: #ff4d4f;">❌ ${message}</div>`;
+            chatMessages.appendChild(errorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ==================== API 调用 ====================
+
+        async function checkApiConnection() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    apiStatusEl.innerHTML = 'API状态: <span class="status-connected">已连接</span>';
+                    return true;
+                }
+            } catch (error) {
+                apiStatusEl.innerHTML = 'API状态: <span class="status-disconnected">连接失败</span>';
+                console.error('API 连接失败:', error);
+                return false;
+            }
+        }
+
+        async function sendQuery() {
+            const question = messageInput.value.trim();
+            if (!question || isLoading) return;
+
+            // 添加用户消息
+            addMessage(question, true);
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            showLoading();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        use_history: true
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // 添加 AI 响应
+                addMessage(data.answer, false, data.sources, data.confidence);
+            } catch (error) {
+                showError(`查询失败: ${error.message}`);
+                console.error('查询错误:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== 事件监听 ====================
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 检查 API 连接
+            await checkApiConnection();
+
+            // 发送消息
+            sendMessageBtn.addEventListener('click', sendQuery);
+
+            // 回车发送（Shift+Enter 换行）
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!e.ctrlKey) {
+                        sendQuery();
+                    }
+                }
+            });
+
+            // 自动调整文本框高度
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+                sendMessageBtn.disabled = this.value.trim() === '';
+            });
+
+            // 初次聚焦
+            setTimeout(() => {
+                messageInput.focus();
+            }, 300);
+        });
+    </script>
+</body>
+</html>
+        raise
+    yield
+    logger.info(f"RAG 问答系统 API 关闭，共处理 {stats['total_queries']} 次查询")
+
+# ==================== 创建 FastAPI 应用 ====================
+app = FastAPI(
+    title="RAG 问答系统 API",
+    description="基于 LangChain/LangGraph 的智能检索增强生成系统",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# CORS 中间件（已修正：allow_credentials=False 避免与 allow_origins=["*"] 冲突）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # 生产环境应替换为具体域名
+    allow_credentials=False,      # 如需携带 Cookie，请将 allow_origins 改为具体域名并设置 True
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 请求日志中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    logger.info(f"{request.method} {request.url.path} - {response.status_code} - {duration:.3f}s")
+    return response
+
+# ==================== Pydantic 模型 ====================
+class DocumentInput(BaseModel):
+    text: str = Field(..., min_length=1, description="文档内容")
+    metadata: Optional[Dict[str, str]] = Field(default_factory=dict, description="文档元数据")
+
+class IndexRequest(BaseModel):
+    documents: List[DocumentInput] = Field(..., min_length=1, description="文档列表")
+    collection_name: str = Field("default", description="目标集合名称")
+
+class IndexResponse(BaseModel):
+    success: bool
+    document_count: int
+    chunk_count: int
+    message: str
+
+class QueryRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000, description="用户问题")
+    use_history: bool = Field(True, description="是否参考对话历史")
+
+class QueryResponse(BaseModel):
+    answer: str
+    sources: List[Dict]
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    timestamp: str
+
+class HistoryResponse(BaseModel):
+    chat_history: List[Dict[str, str]]
+    count: int
+
+class HealthResponse(BaseModel):
+    status: str
+    rag_initialized: bool
+    document_count: int
+    timestamp: str
+
+class StatsResponse(BaseModel):
+    total_queries: int
+    average_confidence: float
+    last_query_time: Optional[str]
+    document_count: int
+
+# ==================== 工具函数 ====================
+def get_rag() -> RAGChain:
+    """安全获取 RAG 系统实例，未初始化则返回 503"""
+    if rag_system is None:
+        raise HTTPException(status_code=503, detail="RAG 系统尚未初始化")
+    return rag_system
+
+def update_stats(confidence: float):
+    """线程安全地更新统计信息（调用前需持有 rag_lock）"""
+    stats["total_queries"] += 1
+    stats["last_query_time"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    stats["confidences"].append(confidence)
+    if len(stats["confidences"]) > 100:
+        stats["confidences"].pop(0)
+
+# ==================== API 端点 ====================
+
+@app.get("/health", response_model=HealthResponse, tags=["系统"])
+async def health_check():
+    """系统健康检查"""
+    init = rag_system is not None
+    docs = stats["total_documents"] if init else 0
+    return HealthResponse(
+        status="healthy" if init else "not initialized",
+        rag_initialized=init,
+        document_count=docs,
+        timestamp=time.strftime("%Y-%m-%dT%H:%M:%S")
+    )
+
+@app.get("/stats", response_model=StatsResponse, tags=["系统"])
+async def get_stats():
+    """获取运行统计信息"""
+    with rag_lock:
+        avg_conf = sum(stats["confidences"]) / len(stats["confidences"]) if stats["confidences"] else 0.0
+        return StatsResponse(
+            total_queries=stats["total_queries"],
+            average_confidence=round(avg_conf, 2),
+            last_query_time=stats["last_query_time"],
+            document_count=stats["total_documents"]
+        )
+
+@app.post("/index", response_model=IndexResponse, tags=["文档管理"])
+async def index_documents(request: IndexRequest):
+    """
+    批量索引新文档（重建指定集合，会覆盖原有同名集合内容）
+    """
+    global stats
+    with rag_lock:
+        r = get_rag()
+        try:
+            texts = [doc.text for doc in request.documents]
+            metadatas = [doc.metadata for doc in request.documents]
+            r.index_documents(texts, metadatas, collection_name=request.collection_name)
+            stats["total_documents"] = r.document_count  # 同步文档总数
+            return IndexResponse(
+                success=True,
+                document_count=len(request.documents),
+                chunk_count=r.document_count,
+                message=f"成功索引 {len(request.documents)} 个文档到集合 '{request.collection_name}'"
+            )
+        except Exception as e:
+            logger.error(f"索引失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/index/sample", response_model=IndexResponse, tags=["文档管理"])
+async def index_sample_documents():
+    """加载内置示例文档（替换默认集合内容）"""
+    global stats
+    with rag_lock:
+        r = get_rag()
+        try:
+            # 将 clear_history 放入 try 块，避免异常时影响后续操作
+            r.clear_history()
+            texts = [doc["text"] for doc in SAMPLE_DOCUMENTS]
+            metadatas = [doc["metadata"] for doc in SAMPLE_DOCUMENTS]
+            r.index_documents(texts, metadatas, collection_name="default")
+            stats["total_documents"] = r.document_count
+            return IndexResponse(
+                success=True,
+                document_count=len(SAMPLE_DOCUMENTS),
+                chunk_count=r.document_count,
+                message="示例文档索引完成"
+            )
+        except Exception as e:
+            logger.error(f"索引示例文档失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/documents/add", response_model=IndexResponse, tags=["文档管理"])
+async def add_documents(request: IndexRequest):
+    """向当前索引增量添加文档（不重建索引）"""
+    global stats
+    with rag_lock:
+        r = get_rag()
+        if not r.retriever:
+            raise HTTPException(status_code=400, detail="尚未创建索引，请先调用 /index")
+        try:
+            texts = [doc.text for doc in request.documents]
+            metadatas = [doc.metadata for doc in request.documents]
+            r.add_documents(texts, metadatas)
+            stats["total_documents"] = r.document_count
+            # 注意：chunk_count 应返回实际的块数，这里简化为文档数
+            return IndexResponse(
+                success=True,
+                document_count=len(request.documents),
+                chunk_count=len(request.documents),
+                message=f"已添加 {len(request.documents)} 个文档"
+            )
+        except Exception as e:
+            logger.error(f"增量添加失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/collections", response_model=List[str], tags=["集合管理"])
+async def list_collections():
+    """列出所有持久化集合名称（内存模式下仅返回 'default'）"""
+    with rag_lock:
+        r = get_rag()
+        if r.persist_directory:
+            return r.list_collections()
+        else:
+            return ["default"]
+
+@app.delete("/collections/{collection_name}", tags=["集合管理"])
+async def delete_collection(collection_name: str):
+    """删除指定持久化集合（内存模式下不支持）"""
+    with rag_lock:
+        r = get_rag()
+        if not r.persist_directory:
+            raise HTTPException(status_code=400, detail="内存模式下不支持删除集合")
+        try:
+            r.delete_collection(collection_name)
+            # 简化处理：清零文档计数（实际应减去被删除集合的文档数）
+            stats["total_documents"] = 0
+            return {"message": f"集合 '{collection_name}' 已删除", "success": True}
+        except Exception as e:
+            logger.error(f"删除集合失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/query", response_model=QueryResponse, tags=["问答"])
+async def query_rag(request: QueryRequest):
+    """向 RAG 系统提问"""
+    with rag_lock:
+        r = get_rag()
+        original_history = None
+        # 如果不使用历史，备份并清空
+        if not request.use_history:
+            original_history = r.chat_history.copy()
+            r.clear_history()
+        try:
+            result = r.query(request.question)
+            update_stats(result["confidence"])
+            return QueryResponse(
+                answer=result["answer"],
+                sources=result["sources"],
+                confidence=result["confidence"],
+                timestamp=time.strftime("%Y-%m-%dT%H:%M:%S")
+            )
+        except Exception as e:
+            logger.error(f"查询失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            # 确保无论成功或失败，历史都能恢复
+            if original_history is not None:
+                r.chat_history = original_history
+
+@app.get("/history", response_model=HistoryResponse, tags=["对话管理"])
+async def get_chat_history():
+    """获取当前对话历史"""
+    with rag_lock:
+        r = get_rag()
+        return HistoryResponse(
+            chat_history=r.chat_history,
+            count=len(r.chat_history)
+        )
+
+@app.delete("/history", tags=["对话管理"])
+async def clear_chat_history():
+    """清除对话历史"""
+    with rag_lock:
+        r = get_rag()
+        r.clear_history()
+        return {"message": "对话历史已清除", "success": True}
+
+@app.post("/reset", tags=["系统"])
+async def reset_system():
+    """重置整个系统（清空所有数据与统计）"""
+    global rag_system, stats
+    with rag_lock:
+        rag_system = RAGChain(config=rag_config, persist_directory=PERSIST_DIRECTORY)
+        stats = {
+            "total_queries": 0,
+            "total_documents": 0,
+            "last_query_time": None,
+            "confidences": []
+        }
+        return {"message": "系统已重置", "success": True}
+
+# ==================== 启动入口 ====================
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",          # 若本文件名为 main.py 则用 "main:app"
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
