@@ -1,0 +1,11 @@
+python-dotenv
+fastapi
+uvicorn
+pydantic
+langchain
+langchain-openai
+langgraph
+numpy
+langchain_chroma
+langchain_text_splitters
+langchain_community
