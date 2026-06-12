@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # 导入研究助手核心函数
-from reserch_assistant import run_research
+from research_assistant import run_research
 
 # ==================== 配置加载 ====================
 dotenv.load_dotenv()
