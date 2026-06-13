@@ -166,12 +166,12 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 ```bash
 # 启动客服系统 API
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+cd Agent && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # 或运行各子系统 Demo
-python multi_agent.py
-python rag.py
-python reserch_assistant.py
+cd Agent && python multi_agent.py
+cd RAG && python rag.py
+cd Research_assistant && python research_assistant.py
 ```
 
 ---
@@ -180,10 +180,18 @@ python reserch_assistant.py
 
 ```
 AI/
-├── multi_agent.py           # 多代理智能客服系统核心
-├── rag.py                   # RAG 智能问答系统核心
-├── reserch_assistant.py     # 智能研究助手核心
-├── main.py                  # FastAPI 服务入口
+├── Agent/                   # 多代理智能客服系统
+│   ├── multi_agent.py
+│   ├── main.py
+│   └── index.html
+├── RAG/                     # RAG 智能问答系统
+│   ├── rag.py
+│   ├── main.py
+│   └── index.html
+├── Research_assistant/     # 智能研究助手
+│   ├── research_assistant.py
+│   ├── main.py
+│   └── index.html
 ├── .env                     # 环境变量配置
 ├── requirements.txt         # 依赖列表
 └── README.md                # 本文件
