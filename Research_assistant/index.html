@@ -323,7 +323,7 @@
                     请输入您感兴趣的研究主题，我将生成一份完整的研究报告。
                 </p>
                 <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
-                    后端地址: <code>http://localhost:8000</code>
+                    后端地址: <code>http://localhost:8003</code>
                 </p>
             </div>
         </div>
@@ -349,7 +349,7 @@
     <script>
         (function() {
             // ==================== 配置 ====================
-            const API_BASE_URL = 'http://localhost:8000';
+            const API_BASE_URL = 'http://localhost:8003';
             const chatMessages = document.getElementById('chat-messages');
             const messageInput = document.getElementById('message-input');
             const sendMessageBtn = document.getElementById('send-message');
@@ -386,7 +386,6 @@
             }
 
             function getScoreClass(score) {
-                // 质量评分 0-10，转成 0-1 区间判断
                 const normalized = score / 10;
                 if (normalized >= 0.8) return 'score-high';
                 if (normalized >= 0.6) return 'score-medium';
@@ -402,17 +401,13 @@
                 if (isUser) {
                     messageDiv.innerHTML = `<div class="message-content">${escapeHtml(content)}</div>`;
                 } else {
-                    // AI 消息：研究报告内容
                     let reportHtml = '';
                     try {
-                        // 使用 marked 渲染 Markdown 为 HTML（marked 默认会转义 HTML 标签，安全）
                         reportHtml = marked.parse(content);
                     } catch (e) {
-                        // 如果渲染失败，回退到转义文本
                         reportHtml = `<pre>${escapeHtml(content)}</pre>`;
                     }
 
-                    // 构建元信息栏（研究统计）
                     let metaHtml = '';
                     if (meta.title || meta.quality_score !== undefined) {
                         let items = [];
@@ -500,7 +495,6 @@
 
                     const data = await response.json();
 
-                    // 构造元数据对象
                     const meta = {
                         title: data.title,
                         quality_score: data.quality_score,
@@ -509,7 +503,6 @@
                         citation_count: data.citations ? data.citations.length : 0
                     };
 
-                    // 展示报告
                     addMessage(data.report, false, meta);
                 } catch (error) {
                     showError(`请求失败: ${error.message}`);

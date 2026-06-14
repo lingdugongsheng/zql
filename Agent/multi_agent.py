@@ -1,6 +1,6 @@
 # %%
 # ==================== 第一部分：导入必要的库 ====================
-import os, sys, json, logging, threading
+import os, sys, json, logging
 from typing import List, Dict, Any, TypedDict, Literal
 from datetime import datetime
 
@@ -26,7 +26,6 @@ def get_model():
 
 # %%
 # ==================== 第三部分：模拟数据 ====================
-# （保持不变，此处省略以保持简洁，实际文件完整）
 MOCK_ORDERS = {
     "ORD001": {"status": "已发货", "product": "智能手表 Pro", "price": 1299, "shipping": "顺丰快递", "tracking": "SF1234567890", "estimated_delivery": "2024-12-20"},
     "ORD002": {"status": "处理中", "product": "无线耳机 Max", "price": 899, "shipping": "待发货", "tracking": None, "estimated_delivery": "2024-12-22"},
@@ -97,9 +96,8 @@ def get_product_recommendations(budget: int) -> str:
 @tool
 def search_faq(problem_type: str) -> str:
     """搜索常见问题解答，根据问题类型关键词匹配FAQ答案"""
-    # MODIFIED: 改为单向匹配，仅当用户输入是问题类型的子串时返回，减少误匹配
     for key, answer in FAQ_DATABASE.items():
-        if problem_type in key:                 # 例如 "连接" 匹配 "连接问题"
+        if problem_type in key:
             return f"【{key}】\n{answer}"
     return "未找到相关FAQ，建议联系人工客服获取更多帮助。"
 
@@ -175,7 +173,6 @@ class BaseAgent:
             elif role in ("assistant", "ai"):
                 messages.append(AIMessage(content=msg["content"]))
             else:
-                # MODIFIED: 未知角色跳过并记录警告，而不是默认当作用户消息
                 logger.warning(f"忽略未知消息角色: {role}")
                 continue
         messages.append(HumanMessage(content=message))
@@ -348,13 +345,10 @@ class CustomerServiceSystem:
         self.product_agent = ProductConsultAgent()
         self.general_agent = GeneralChatAgent()
         self.quality_checker = QualityChecker()
-        # Chat history persisted at API layer (read/written by main.py under lock).
-        # The graph operates on a snapshot passed through handle_message().
         self.current_history = []
         self.graph = self._build_graph()
 
     def _build_graph(self):
-        # --- 节点函数定义 (保持原有逻辑，仅注释说明) ---
         def classify_intent(state: CustomerServiceState) -> CustomerServiceState:
             logger.info("分析用户意图")
             result = self.classifier.classify(state["user_message"])
@@ -431,7 +425,6 @@ class CustomerServiceSystem:
                 score = 0.6
             state["quality_score"] = score
 
-            # MODIFIED: 通用对话同时考虑模型判断和分数，避免忽略明确升级信号
             if state["intent"] == "general_chat":
                 model_says_escalate = result.get("needs_escalation", False)
                 if (model_says_escalate or state["quality_score"] < 0.3) and not state.get("already_escalated", False):
@@ -464,7 +457,6 @@ class CustomerServiceSystem:
         def respond(state: CustomerServiceState) -> CustomerServiceState:
             return state
 
-        # --- 状态图构建 ---
         graph = StateGraph(CustomerServiceState)
         graph.add_node("classify", classify_intent)
         graph.add_node("tech_support", tech_support_handler)
@@ -532,7 +524,6 @@ class CustomerServiceSystem:
             }
         except Exception as e:
             logger.error(f"处理消息时发生异常: {e}", exc_info=True)
-            # MODIFIED: 系统异常时不标记为升级，避免错误触发转人工
             return {
                 "response": "非常抱歉，系统暂时遇到了一点问题，请稍后再试或联系人工客服。",
                 "intent": "general_chat",
@@ -543,7 +534,7 @@ class CustomerServiceSystem:
 
 
 # %%
-# ==================== 第十二部分：演示主程序（未修改） ====================
+# ==================== 第十二部分：演示主程序 ====================
 def main():
     print("=" * 60)
     print("多代理智能客服系统演示")

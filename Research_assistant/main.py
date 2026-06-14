@@ -2,7 +2,7 @@
 智能研究助手 - FastAPI 后端
 基于 LangGraph 的多阶段研究流程：规划→收集→分析→综合→报告→质检（可迭代）
 """
-import sys, os, logging, time, asyncio
+import sys, os, time, asyncio, threading
 from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 
@@ -23,7 +23,8 @@ import dotenv; dotenv.load_dotenv()
 # ==================== 日志配置 ====================
 logger = setup_logging(__name__)
 
-# ==================== 全局状态 ====================
+# ==================== 全局状态与线程锁 ====================
+stats_lock = threading.Lock()
 stats: Dict[str, Any] = {
     "total_research_tasks": 0,
     "last_task_time": None,
@@ -35,7 +36,6 @@ stats: Dict[str, Any] = {
 async def lifespan(app: FastAPI):
     """管理应用启动与关闭"""
     logger.info("智能研究助手 API 启动中...")
-    # 可在此处进行模型预热或检查
     yield
     logger.info(f"智能研究助手 API 关闭，共完成 {stats['total_research_tasks']} 个研究任务")
 
@@ -49,7 +49,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS 中间件（已修正 allow_credentials=False）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],          # 生产环境请替换为具体域名
@@ -58,7 +57,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 请求日志中间件
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -102,7 +100,7 @@ class StatsResponse(BaseModel):
 
 # ==================== 工具函数 ====================
 def update_stats(quality_score: float):
-    """更新统计信息"""
+    """线程安全地更新统计信息（调用前需持有 stats_lock）"""
     stats["total_research_tasks"] += 1
     stats["last_task_time"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     stats["quality_scores"].append(quality_score)
@@ -114,21 +112,28 @@ def update_stats(quality_score: float):
 @app.get("/health", response_model=HealthResponse, tags=["系统"])
 async def health_check():
     """系统健康检查"""
+    with stats_lock:
+        total = stats["total_research_tasks"]
     return HealthResponse(
         status="healthy",
-        total_tasks=stats["total_research_tasks"],
+        total_tasks=total,
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%S")
     )
 
 @app.get("/stats", response_model=StatsResponse, tags=["系统"])
 async def get_stats():
     """获取运行统计信息"""
-    avg_quality = (sum(stats["quality_scores"]) / len(stats["quality_scores"])
-                   if stats["quality_scores"] else 0.0)
+    with stats_lock:
+        total = stats["total_research_tasks"]
+        last = stats["last_task_time"]
+        if stats["quality_scores"]:
+            avg_quality = sum(stats["quality_scores"]) / len(stats["quality_scores"])
+        else:
+            avg_quality = 0.0
     return StatsResponse(
-        total_tasks=stats["total_research_tasks"],
+        total_tasks=total,
         average_quality=round(avg_quality, 2),
-        last_task_time=stats["last_task_time"]
+        last_task_time=last
     )
 
 @app.post("/research", response_model=ResearchResponse, tags=["研究"])
@@ -139,12 +144,10 @@ async def create_research(request: ResearchRequest):
     """
     logger.info(f"收到研究请求: {request.topic}")
     try:
-        # 调用研究助手的核心函数，返回结果字典
         result = await asyncio.to_thread(run_research, request.topic)
         if result is None:
             raise HTTPException(status_code=500, detail="研究任务执行失败，请稍后重试。")
 
-        # 提取需要的数据
         report_text = result.get("final_report", "")
         citations = result.get("citations", [])
         quality_score = result.get("quality_score", 0.0)
@@ -152,10 +155,9 @@ async def create_research(request: ResearchRequest):
         search_count = len(result.get("search_results", []))
         analyzed_count = len(result.get("analyzed_sources", []))
 
-        # 更新统计
-        update_stats(quality_score)
+        with stats_lock:
+            update_stats(quality_score)
 
-        # 构造响应
         return ResearchResponse(
             topic=request.topic,
             title=result.get("outline", {}).get("title", request.topic),

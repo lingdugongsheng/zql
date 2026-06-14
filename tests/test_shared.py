@@ -1,11 +1,7 @@
 """Tests for shared utilities (no LLM dependency)."""
-import os, sys, importlib.util
+import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-spec = importlib.util.spec_from_file_location('utils',
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), 'shared', 'utils.py'))
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-j = utils.safe_parse_json
+from shared.utils import safe_parse_json as j
 
 assert j('{"key":"value"}') == {"key": "value"}
 assert j('```json\n{"a":1}\n```') == {"a": 1}

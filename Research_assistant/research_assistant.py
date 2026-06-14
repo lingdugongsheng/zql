@@ -4,7 +4,6 @@ import os, sys, json
 import logging                     # 日志模块，记录程序运行信息
 from typing import TypedDict, Literal, Annotated, Optional  # 类型注解，提高代码可读性
 from datetime import datetime      # 获取当前时间，用于报告生成时间戳
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from shared import safe_parse_json, setup_logging, ModelCache, llm_invoke_with_retry
@@ -13,7 +12,6 @@ import dotenv                      # 从 .env 文件加载环境变量（API 密
 from langchain_core.messages import HumanMessage, AIMessage  # 人类和 AI 消息类型
 from langgraph.graph import StateGraph, START, END, add_messages  # 状态图核心类及消息列表合并函数
 from langgraph.checkpoint.memory import MemorySaver           # 内存检查点保存器，记录状态历史
-from pydantic import BaseModel, Field                         # 数据模型，用于结构化输出定义
 
 # %%
 # ==================== 第二部分：日志配置 ====================
@@ -42,63 +40,7 @@ def get_model():
     return _model_cache.get()
 
 # %%
-# ==================== 第五部分：Pydantic 数据模型 ====================
-# 定义研究中使用的各种数据结构，用于类型约束和序列化
-
-class SearchResult(BaseModel):
-    """搜索结果：模拟从数据库或网络检索到的单条文献/新闻"""
-    title: str                                 # 文献/文章标题
-    source: str                                # 来源（如期刊名、网站名）
-    url: str                                   # 可访问链接
-    snippet: str                               # 内容摘要或片段
-    relevance_score: float = Field(ge=0.0, le=1.0)  # 与主题的相关性评分（0~1）
-    publish_date: Optional[str] = None         # 发布日期（可选）
-
-
-class ResearchFinding(BaseModel):
-    """研究发现：从分析中提炼的关键发现，包含证据和来源"""
-    topic: str                                 # 所属研究主题
-    key_points: list[str]                      # 核心观点列表
-    evidence: list[str]                        # 支持该发现的证据列表
-    confidence: float = Field(ge=0.0, le=1.0)  # 对该发现的确信度（0~1）
-    sources: list[str]                         # 引用来源的标题或ID列表
-
-
-class ResearchOutline(BaseModel):
-    """研究大纲：LLM 生成的研究计划，指导后续步骤"""
-    title: str                                 # 研究报告标题
-    abstract: str                              # 研究摘要（简短描述）
-    sections: list[str]                        # 报告各章节标题列表，如["引言","方法","结论"]
-    key_questions: list[str]                   # 需要回答的关键研究问题
-    methodology: str                           # 拟采用的研究方法描述
-
-
-class Citation(BaseModel):
-    """参考文献：符合学术规范的单条引用"""
-    id: str                                    # 引用标识符（如"[1]"）
-    authors: list[str]                         # 作者列表
-    title: str                                 # 文献标题
-    source: str                                # 文献出处（期刊/会议/网站名）
-    year: int                                  # 发表年份
-    url: Optional[str] = None                  # 在线链接（可选）
-
-
-class ResearchReport(BaseModel):
-    """最终研究报告：整合所有阶段产出的结构化报告"""
-    title: str                                 # 报告标题
-    executive_summary: str                     # 执行摘要（概括核心内容）
-    introduction: str                          # 引言部分
-    methodology: str                           # 方法论部分
-    findings: list[str]                        # 主要发现列表
-    analysis: str                              # 分析讨论部分
-    conclusions: list[str]                     # 结论列表
-    recommendations: list[str]                 # 建议/展望列表
-    citations: list[Citation]                  # 参考文献列表，每个元素为 Citation 对象
-    generated_at: str                          # 报告生成时间（ISO格式字符串）
-
-
-# %%
-# ==================== 第六部分：研究状态定义 ====================
+# ==================== 第五部分：研究状态定义 ====================
 class ResearchState(TypedDict):
     """研究助手工作流中共享的状态，贯穿所有节点"""
     messages: Annotated[list, add_messages]  # 消息历史，使用 add_messages 合并新消息
@@ -117,7 +59,7 @@ class ResearchState(TypedDict):
     quality_feedback: str                    # 质量反馈文本
 
 # %%
-# ==================== 第七部分：模拟数据源 ====================
+# ==================== 第六部分：模拟数据源 ====================
 # 模拟学术数据库和网络搜索结果，实际应用可替换为真实 API 调用
 
 ACADEMIC_DATABASE = {
@@ -159,7 +101,7 @@ WEB_SEARCH_RESULTS = {
 }
 
 # %%
-# ==================== 第八部分：工具函数 ====================
+# ==================== 第七部分：工具函数 ====================
 def search_academic_database(topic: str, max_results: int = 5) -> list[dict]:
     """从模拟学术数据库中搜索与主题相关的论文"""
     results = []
@@ -179,24 +121,13 @@ def search_web(topic: str, max_results: int = 5) -> list[dict]:
                 results.append({**item, "type": "web", "relevance_score": 0.8})
     return results[:max_results]
 
-def format_citation(source: dict, citation_id: str) -> Citation:
-    """将原始来源数据格式化为 Citation 对象"""
-    return Citation(
-        id=citation_id,
-        authors=source.get("authors", ["Unknown"]),        # 若缺少作者，默认为 Unknown
-        title=source.get("title", "Untitled"),
-        source=source.get("source", "Unknown"),
-        year=source.get("year", 2024),
-        url=source.get("url")                               # url 可选
-    )
-
 # ==================== LLM 调用重试机制 ====================
 def llm_call_with_retry(prompt_messages, max_retries=3, delay=1.5):
     """Backward-compat wrapper; delegates to shared.llm_invoke_with_retry."""
     return llm_invoke_with_retry(_model_cache, prompt_messages, max_retries, delay)
 
 # %%
-# ==================== 第九部分：智能体节点与图构建 ====================
+# ==================== 第八部分：智能体节点与图构建 ====================
 def create_research_assistant():
     """
     创建并返回编译好的研究助手状态图。
@@ -528,7 +459,7 @@ def create_research_assistant():
     return graph.compile(checkpointer=memory)
 
 # %%
-# ==================== 第十部分：运行研究任务 ====================
+# ==================== 第九部分：运行研究任务 ====================
 def run_research(topic: str):
     """启动研究助手，针对给定主题执行整个研究流程，并打印报告和统计信息"""
     logger.info("=" * 60)
