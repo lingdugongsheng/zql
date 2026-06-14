@@ -1,106 +1,129 @@
+```html
+<!-- 文档类型声明，告诉浏览器使用 HTML5 标准来解析页面 -->
 <!DOCTYPE html>
+<!-- 网页根元素，lang="zh-CN" 表示页面主要语言为简体中文，帮助搜索引擎和屏幕阅读器 -->
 <html lang="zh-CN">
+<!-- head 区域：页面的“后台配置”，不会直接显示在页面中 -->
 <head>
+    <!-- 设置字符编码为 UTF-8，保证中文、英文、Emoji 等所有文字正常显示 -->
     <meta charset="UTF-8">
+    <!-- 视口配置：让页面宽度自动适配设备宽度，初始缩放为1，适用于手机等移动设备 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 浏览器标签页上显示的标题 -->
     <title>智能研究助手</title>
+    <!-- 引入 Font Awesome 6.4 图标库，用于使用矢量图标（如显微镜、机器人） -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- 引入 marked.js 用于渲染 Markdown 报告 -->
+    <!-- 引入 marked.js 库，用于将 Markdown 格式的报告文本转换为 HTML 显示 -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 内部样式表，定义整个页面的视觉外观 -->
     <style>
+        /* ===== 全局重置 ===== */
+        /* 选择所有元素，去掉浏览器默认的内外边距，统一盒模型和基础字体 */
         * {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            box-sizing: border-box;   /* 元素宽高包含边框和内边距，方便控制尺寸 */
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; /* 优先使用现代英文字体，回退微软雅黑 */
         }
 
+        /* ===== 页面背景 ===== */
         body {
+            /* 背景：从浅蓝渐变到中蓝，角度135度（对角线） */
             background: linear-gradient(135deg, #e6f7ff 0%, #b3e0ff 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            min-height: 100vh;        /* 最小高度占满整个视口，保证背景覆盖 */
+            display: flex;            /* 使用弹性布局 */
+            justify-content: center;  /* 水平居中聊天卡片 */
+            align-items: center;      /* 垂直居中聊天卡片 */
+            padding: 20px;            /* 四周留白，避免窄屏幕卡片贴边 */
         }
 
+        /* ===== 聊天卡片容器 ===== */
         .chat-container {
             width: 100%;
-            max-width: 900px;
+            max-width: 900px;         /* 最大宽度900px，大屏幕下不会过宽 */
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2);
-            overflow: hidden;
+            border-radius: 20px;      /* 大圆角，营造卡片柔和感 */
+            box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2); /* 蓝色半透明阴影，产生浮起效果 */
+            overflow: hidden;         /* 裁剪超出圆角的内容 */
             display: flex;
-            flex-direction: column;
-            height: 85vh;
+            flex-direction: column;   /* 头部、消息区、输入区垂直排列 */
+            height: 85vh;             /* 占视口高度的85%，留下呼吸空间 */
         }
 
+        /* ===== 顶部标题栏 ===== */
         .chat-header {
-            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%); /* 深蓝渐变 */
             color: white;
             padding: 20px;
             text-align: center;
             font-size: 1.3rem;
-            font-weight: 600;
+            font-weight: 600;          /* 半粗体 */
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            justify-content: center;   /* 图标和文字居中 */
+            gap: 12px;                 /* 图标与文字间距 */
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 底部轻微阴影 */
         }
 
+        /* 头部内图标放大一点 */
         .chat-header i {
             font-size: 1.5rem;
         }
 
+        /* ===== 消息展示区域 ===== */
         .chat-messages {
-            flex: 1;
+            flex: 1;                   /* 占据剩余所有空间 */
             padding: 20px;
-            overflow-y: auto;
-            background: #f9fbfd;
+            overflow-y: auto;          /* 内容超出时纵向滚动 */
+            background: #f9fbfd;      /* 浅灰蓝背景，与白色气泡区分 */
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 15px;                 /* 每条消息之间的垂直间距 */
         }
 
+        /* ===== 单条消息气泡（通用样式） ===== */
         .message {
-            max-width: 90%;
+            max-width: 90%;            /* 最大宽度90%，不撑满 */
             padding: 16px 20px;
             border-radius: 16px;
             line-height: 1.6;
             position: relative;
-            animation: fadeIn 0.3s ease;
+            animation: fadeIn 0.3s ease; /* 淡入动画 */
         }
 
+        /* 淡入动画：从下方偏移到原位，透明度从0到1 */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* 用户消息：蓝色渐变，靠右 */
         .user-message {
             background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
             color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
+            align-self: flex-end;     /* 靠右对齐 */
+            border-bottom-right-radius: 4px; /* 右下角稍尖，模拟气泡尾巴 */
         }
 
+        /* AI 消息（研究报告）：白色，靠左，宽度100% */
         .ai-message {
             background: white;
             color: #333;
-            align-self: flex-start;
+            align-self: flex-start;   /* 靠左对齐 */
             border: 1px solid #e8f0fe;
             border-bottom-left-radius: 4px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-            width: 100%; /* 报告通常较长，占满容器宽度 */
+            width: 100%;               /* 报告较长，撑满容器宽度 */
         }
 
+        /* 消息文本内容：保留换行，自动断词 */
         .message-content {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            white-space: pre-wrap;    /* 保留空格和换行，同时正常换行 */
+            word-wrap: break-word;    /* 长单词或URL自动断行 */
         }
 
-        /* 报告内容样式（Markdown 渲染后） */
+        /* ===== 报告内容样式（Markdown 渲染后） ===== */
+        /* 标题颜色和间距 */
         .report-body h1, .report-body h2, .report-body h3 {
             color: #1677ff;
             margin: 16px 0 8px;
@@ -108,27 +131,31 @@
         .report-body h1 { font-size: 1.5rem; border-bottom: 2px solid #e8f0fe; padding-bottom: 6px; }
         .report-body h2 { font-size: 1.2rem; }
         .report-body h3 { font-size: 1rem; }
-        .report-body p { margin: 8px 0; }
-        .report-body ul, .report-body ol { margin: 8px 0 8px 20px; }
+        .report-body p { margin: 8px 0; }                     /* 段落间距 */
+        .report-body ul, .report-body ol { margin: 8px 0 8px 20px; } /* 列表缩进 */
+        /* 引用块样式 */
         .report-body blockquote {
             border-left: 4px solid #1677ff;
             padding-left: 16px;
             color: #555;
             margin: 12px 0;
         }
+        /* 行内代码样式 */
         .report-body code {
             background: #f0f7ff;
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
         }
+        /* 代码块样式 */
         .report-body pre {
             background: #f0f7ff;
             padding: 12px;
             border-radius: 8px;
-            overflow-x: auto;
+            overflow-x: auto;       /* 代码过长时水平滚动 */
             margin: 12px 0;
         }
+        /* 表格样式 */
         .report-body table {
             border-collapse: collapse;
             width: 100%;
@@ -144,64 +171,70 @@
             color: #1677ff;
         }
 
-        /* 元信息区域 */
+        /* ===== 元信息标签区域 ===== */
         .meta-info {
             margin-top: 16px;
             padding-top: 12px;
-            border-top: 1px solid #e8f0fe;
+            border-top: 1px solid #e8f0fe; /* 上边框分隔 */
             font-size: 0.85rem;
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: wrap;        /* 标签过多时自动换行 */
             gap: 10px;
             align-items: center;
         }
 
+        /* 普通元信息标签（意图、分数等） */
         .meta-item {
             background: #f0f7ff;
             padding: 4px 12px;
-            border-radius: 12px;
+            border-radius: 12px;    /* 胶囊形 */
             color: #1677ff;
             font-weight: 500;
         }
 
+        /* 质量评分标签，根据分数显示不同颜色 */
         .score-badge {
             padding: 4px 12px;
             border-radius: 12px;
             font-weight: 500;
         }
-        .score-high { background: #d9f7be; color: #52c41a; }
-        .score-medium { background: #fff7e6; color: #fa8c16; }
-        .score-low { background: #fff1f0; color: #ff4d4f; }
+        .score-high { background: #d9f7be; color: #52c41a; }   /* 高（≥80%）：绿色 */
+        .score-medium { background: #fff7e6; color: #fa8c16; } /* 中（60-79%）：橙色 */
+        .score-low { background: #fff1f0; color: #ff4d4f; }    /* 低（<60%）：红色 */
 
+        /* ===== 底部输入区域 ===== */
         .chat-input-area {
             padding: 15px 20px;
             background: white;
-            border-top: 1px solid #e8f0fe;
+            border-top: 1px solid #e8f0fe; /* 顶部分隔线 */
         }
 
+        /* 输入框+按钮的横向容器 */
         .chat-input {
             display: flex;
             gap: 10px;
             background: #f9fbfd;
             border-radius: 16px;
-            overflow: hidden;
+            overflow: hidden;       /* 裁剪内部圆角 */
             box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
         }
 
+        /* 文本输入框 */
         #message-input {
-            flex: 1;
+            flex: 1;                /* 占满剩余宽度 */
             border: none;
             padding: 14px 18px;
             font-size: 1rem;
-            outline: none;
-            resize: none;
+            outline: none;          /* 去除聚焦时的默认轮廓 */
+            resize: none;           /* 禁止手动拖拽改变大小 */
             background: transparent;
             color: #333;
         }
-
-        #message-input::placeholder { color: #999; }
+        #message-input::placeholder { color: #999; } /* 占位符颜色 */
+        /* 输入框聚焦时显示蓝色光晕 */
         #message-input:focus { box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2); }
 
+        /* 发送按钮 */
         .send-btn {
             background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
             color: white;
@@ -210,23 +243,22 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
+            cursor: pointer;        /* 鼠标变为手指形状 */
             font-size: 1.1rem;
-            transition: all 0.2s;
+            transition: all 0.2s;   /* 所有变化平滑过渡0.2秒 */
             border-radius: 16px;
         }
-
         .send-btn:hover {
             background: linear-gradient(135deg, #0958d9 0%, #003eb3 100%);
-            transform: scale(1.05);
+            transform: scale(1.05); /* 悬停时微放大 */
         }
-
         .send-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.5;           /* 禁用时半透明 */
             cursor: not-allowed;
             transform: none;
         }
 
+        /* 加载动画区域 */
         .loading-indicator {
             text-align: center;
             padding: 10px;
@@ -234,13 +266,14 @@
             font-size: 0.9rem;
         }
 
+        /* 旋转的圆环（spinner） */
         .spinner {
-            border: 2px solid rgba(22, 119, 255, 0.3);
-            border-top: 2px solid #1677ff;
+            border: 2px solid rgba(22, 119, 255, 0.3); /* 浅色环 */
+            border-top: 2px solid #1677ff;               /* 顶部深色形成缺口 */
             border-radius: 50%;
             width: 20px;
             height: 20px;
-            animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;          /* 1秒一圈无限旋转 */
             margin: 0 auto 8px;
         }
 
@@ -249,31 +282,28 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* ===== 初始欢迎界面 ===== */
         .welcome-message {
             text-align: center;
             padding: 60px 20px;
             color: #666;
         }
-
         .welcome-icon {
             font-size: 3.5rem;
             color: #1677ff;
             margin-bottom: 20px;
-            animation: pulse 2s infinite;
+            animation: pulse 2s infinite; /* 呼吸灯动画 */
         }
-
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.1); }
         }
-
         .welcome-title {
             font-size: 1.8rem;
             font-weight: 700;
             color: #1677ff;
             margin-bottom: 12px;
         }
-
         .welcome-text {
             font-size: 1rem;
             color: #666;
@@ -281,6 +311,7 @@
             line-height: 1.6;
         }
 
+        /* ===== 底部状态栏 ===== */
         .status-bar {
             background: #f0f7ff;
             padding: 8px 15px;
@@ -289,15 +320,16 @@
             color: #666;
             border-top: 1px solid #e8f0fe;
         }
+        .status-connected { color: #52c41a; }   /* 已连接：绿色 */
+        .status-disconnected { color: #ff4d4f; } /* 未连接：红色 */
 
-        .status-connected { color: #52c41a; }
-        .status-disconnected { color: #ff4d4f; }
-
+        /* ===== 自定义滚动条（Webkit内核） ===== */
         .chat-messages::-webkit-scrollbar { width: 8px; }
         .chat-messages::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         .chat-messages::-webkit-scrollbar-thumb { background: #1677ff; border-radius: 4px; }
         .chat-messages::-webkit-scrollbar-thumb:hover { background: #0958d9; }
 
+        /* ===== 响应式设计：手机端适配 ===== */
         @media (max-width: 768px) {
             .chat-container { height: 90vh; max-width: 100%; border-radius: 16px; }
             .message { max-width: 95%; }
@@ -308,71 +340,89 @@
     </style>
 </head>
 <body>
+    <!-- 整个聊天卡片的最外层容器 -->
     <div class="chat-container">
+        <!-- 顶部标题栏 -->
         <div class="chat-header">
-            <i class="fas fa-microscope"></i>
+            <i class="fas fa-microscope"></i> <!-- 显微镜图标，代表研究 -->
             <span>智能研究助手</span>
         </div>
 
+        <!-- 消息展示区域，动态生成的消息都将放入这个 div -->
         <div class="chat-messages" id="chat-messages">
+            <!-- 初始欢迎界面，用户开始对话后会被移除 -->
             <div class="welcome-message">
-                <div class="welcome-icon"><i class="fas fa-robot"></i></div>
+                <div class="welcome-icon"><i class="fas fa-robot"></i></div> <!-- 机器人图标 -->
                 <h2 class="welcome-title">欢迎使用智能研究助手</h2>
                 <p class="welcome-text">
                     基于 LangGraph 的多阶段研究流程，自动完成规划、信息收集、分析、综合、质量检查。<br>
                     请输入您感兴趣的研究主题，我将生成一份完整的研究报告。
                 </p>
+                <!-- 显示后端API地址，方便调试 -->
                 <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
                     后端地址: <code>http://localhost:8003</code>
                 </p>
             </div>
         </div>
 
+        <!-- 底部输入区域 -->
         <div class="chat-input-area">
             <div class="chat-input">
+                <!-- 文本输入框，初始高度1行，用于输入研究主题 -->
                 <textarea id="message-input" placeholder="请输入研究主题，例如：人工智能在医疗诊断中的应用" rows="1"></textarea>
+                <!-- 发送按钮，初始禁用，输入内容后启用 -->
                 <button class="send-btn" id="send-message" disabled>
-                    <i class="fas fa-paper-plane"></i>
+                    <i class="fas fa-paper-plane"></i> <!-- 纸飞机图标 -->
                 </button>
             </div>
+            <!-- 加载提示，默认隐藏，发送请求后显示 -->
             <div class="loading-indicator" id="loading-indicator" style="display: none;">
                 <div class="spinner"></div>
                 <div>AI 正在生成研究报告，请耐心等待...</div>
             </div>
         </div>
 
+        <!-- 底部状态栏，显示后端API连接状态 -->
         <div class="status-bar">
             <span id="api-status">API状态: <span class="status-disconnected">未连接</span></span>
         </div>
     </div>
 
+    <!-- ==================== JavaScript 交互逻辑 ==================== -->
     <script>
+        // 整个脚本包裹在立即执行函数中，避免变量污染全局作用域
         (function() {
             // ==================== 配置 ====================
-            const API_BASE_URL = 'http://localhost:8003';
-            const chatMessages = document.getElementById('chat-messages');
-            const messageInput = document.getElementById('message-input');
-            const sendMessageBtn = document.getElementById('send-message');
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const apiStatusEl = document.getElementById('api-status');
+            const API_BASE_URL = 'http://localhost:8003';  // 后端API基础地址（研究助手端口）
 
-            let isLoading = false;
+            // 获取页面中的关键DOM元素，后续频繁使用
+            const chatMessages = document.getElementById('chat-messages');         // 消息容器
+            const messageInput = document.getElementById('message-input');         // 输入框
+            const sendMessageBtn = document.getElementById('send-message');        // 发送按钮
+            const loadingIndicator = document.getElementById('loading-indicator'); // 加载动画
+            const apiStatusEl = document.getElementById('api-status');             // 状态栏文字
+
+            let isLoading = false; // 标记是否正在等待服务器响应，防止重复发送
 
             // ==================== 安全转义函数（XSS 防护） ====================
+            // 将用户输入或服务器返回的文本中的 HTML 特殊字符进行转义，防止注入攻击
             function escapeHtml(str) {
                 const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
+                div.textContent = str; // textContent 会自动将 < > 等转换为安全的文本
+                return div.innerHTML;  // 返回转义后的字符串
             }
 
             // ==================== UI 工具函数 ====================
+
+            // 显示加载状态：禁用输入，显示加载动画
             function showLoading() {
                 isLoading = true;
-                loadingIndicator.style.display = 'block';
-                sendMessageBtn.disabled = true;
-                messageInput.disabled = true;
+                loadingIndicator.style.display = 'block';   // 显示加载提示
+                sendMessageBtn.disabled = true;             // 禁用发送按钮
+                messageInput.disabled = true;               // 禁用输入框
             }
 
+            // 隐藏加载状态：恢复输入，隐藏加载动画
             function hideLoading() {
                 isLoading = false;
                 loadingIndicator.style.display = 'none';
@@ -380,34 +430,42 @@
                 messageInput.disabled = false;
             }
 
+            // 如果页面中还存在欢迎界面，就删除它（用户开始使用后不再需要）
             function removeWelcomeIfPresent() {
                 const welcome = document.querySelector('.welcome-message');
                 if (welcome) welcome.remove();
             }
 
+            // 根据质量评分（0-10）返回对应的CSS类名，用于显示不同颜色
             function getScoreClass(score) {
-                const normalized = score / 10;
-                if (normalized >= 0.8) return 'score-high';
-                if (normalized >= 0.6) return 'score-medium';
-                return 'score-low';
+                const normalized = score / 10;            // 归一化到0-1
+                if (normalized >= 0.8) return 'score-high';   // 高
+                if (normalized >= 0.6) return 'score-medium'; // 中
+                return 'score-low';                           // 低
             }
 
+            // 核心函数：在聊天区添加一条消息气泡
             function addMessage(content, isUser = false, meta = {}) {
-                removeWelcomeIfPresent();
+                removeWelcomeIfPresent(); // 有消息就移除欢迎界面
 
                 const messageDiv = document.createElement('div');
+                // 根据是用户还是AI，添加不同的CSS类
                 messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
 
                 if (isUser) {
+                    // 用户消息：直接显示转义后的文本
                     messageDiv.innerHTML = `<div class="message-content">${escapeHtml(content)}</div>`;
                 } else {
+                    // AI消息（研究报告）：使用 marked 库将 Markdown 转换为 HTML
                     let reportHtml = '';
                     try {
-                        reportHtml = marked.parse(content);
+                        reportHtml = marked.parse(content);   // 解析 Markdown
                     } catch (e) {
+                        // 如果解析失败，回退到显示原始文本（用 <pre> 保留格式）
                         reportHtml = `<pre>${escapeHtml(content)}</pre>`;
                     }
 
+                    // 构建元信息标签栏（质量、迭代次数等）
                     let metaHtml = '';
                     if (meta.title || meta.quality_score !== undefined) {
                         let items = [];
@@ -432,16 +490,19 @@
                         }
                     }
 
+                    // 组合报告内容和元信息标签
                     messageDiv.innerHTML = `
                         <div class="report-body">${reportHtml}</div>
                         ${metaHtml}
                     `;
                 }
 
+                // 将气泡添加到消息容器，并自动滚动到底部
                 chatMessages.appendChild(messageDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
+            // 显示红色错误消息
             function showError(message) {
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message ai-message';
@@ -451,9 +512,11 @@
             }
 
             // ==================== API 调用 ====================
+
+            // 检查后端健康状态，更新状态栏显示
             async function checkApiConnection() {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/health`);
+                    const response = await fetch(`${API_BASE_URL}/health`);   // 调用 /health 接口
                     if (response.ok) {
                         apiStatusEl.innerHTML = 'API状态: <span class="status-connected">已连接</span>';
                         return true;
@@ -468,33 +531,40 @@
                 }
             }
 
+            // 发送研究主题到后端，获取并显示报告
             async function sendQuery() {
-                const topic = messageInput.value.trim();
-                if (!topic || isLoading) return;
+                const topic = messageInput.value.trim(); // 获取输入的主题并去除首尾空格
+                if (!topic || isLoading) return;          // 空内容或正在加载中则不处理
 
+                // 1. 显示用户消息
                 addMessage(topic, true);
+                // 2. 清空输入框并重置高度
                 messageInput.value = '';
                 messageInput.style.height = 'auto';
                 showLoading();
 
                 try {
+                    // 3. 向 /research 发送 POST 请求
                     const response = await fetch(`${API_BASE_URL}/research`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ topic: topic })
                     });
 
+                    // 4. 处理错误响应
                     if (!response.ok) {
                         let detail = `服务器错误 (${response.status})`;
                         try {
                             const errorData = await response.json();
                             detail = errorData.detail || detail;
-                        } catch (_) { /* 忽略 */ }
+                        } catch (_) { /* 忽略 JSON 解析错误 */ }
                         throw new Error(detail);
                     }
 
+                    // 5. 解析成功响应
                     const data = await response.json();
 
+                    // 6. 构造元数据对象，包含标题、质量评分、迭代次数等
                     const meta = {
                         title: data.title,
                         quality_score: data.quality_score,
@@ -503,40 +573,50 @@
                         citation_count: data.citations ? data.citations.length : 0
                     };
 
+                    // 7. 将报告内容（Markdown）添加到消息区
                     addMessage(data.report, false, meta);
                 } catch (error) {
+                    // 网络或服务器错误时显示红色提示
                     showError(`请求失败: ${error.message}`);
                     console.error('研究请求错误:', error);
                 } finally {
+                    // 无论成功或失败，最终都要隐藏加载状态
                     hideLoading();
                 }
             }
 
             // ==================== 事件绑定 ====================
+            // 当页面的 HTML 结构完全加载和解析后，执行初始化
             document.addEventListener('DOMContentLoaded', async () => {
+                // 先检查后端是否在线
                 await checkApiConnection();
 
+                // 绑定发送按钮的点击事件
                 sendMessageBtn.addEventListener('click', sendQuery);
 
+                // 键盘事件：Enter 键发送，Shift+Enter 换行
                 messageInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
+                        e.preventDefault(); // 阻止默认的换行
                         sendQuery();
                     }
                 });
 
+                // 输入内容变化时：自动调整文本框高度，并控制发送按钮是否可用
                 messageInput.addEventListener('input', () => {
-                    messageInput.style.height = 'auto';
-                    messageInput.style.height = messageInput.scrollHeight + 'px';
-                    sendMessageBtn.disabled = messageInput.value.trim() === '';
+                    messageInput.style.height = 'auto'; // 重置高度
+                    messageInput.style.height = messageInput.scrollHeight + 'px'; // 设置为实际内容高度
+                    sendMessageBtn.disabled = messageInput.value.trim() === ''; // 无内容时禁用按钮
                 });
 
-                // 定期检测 API 状态（每 30 秒）
+                // 每隔30秒重新检查一次后端连接状态
                 setInterval(checkApiConnection, 30000);
 
+                // 300毫秒后让输入框自动获得焦点，方便用户直接输入
                 setTimeout(() => messageInput.focus(), 300);
             });
-        })();
+        })(); // 立即执行函数结束
     </script>
 </body>
 </html>
+```
