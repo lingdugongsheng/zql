@@ -25,7 +25,7 @@ from langgraph.graph import StateGraph                        # LangGraph 状态
 
 # %%
 # ===================第二部分：加载和验证环境变量===================
-import dotenv; dotenv.load_dotenv()
+dotenv.load_dotenv()
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")     # 读取DeepSeek的API密钥
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL")   # 读取DeepSeek的API基础URL
