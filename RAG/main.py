@@ -4,14 +4,13 @@ RAG 问答系统 - FastAPI 后端
 改进版：修正 CORS 警告、安全的历史恢复、健壮的异常处理
 """
 
-import os
-import logging
-import time
-import threading
+import sys, os, logging, time, threading, asyncio
 from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 
-import dotenv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import setup_logging
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,15 +20,11 @@ from pydantic import BaseModel, Field
 from rag import RAGChain, RAGConfig, SAMPLE_DOCUMENTS
 
 # ==================== 配置加载 ====================
-dotenv.load_dotenv()
+import dotenv; dotenv.load_dotenv()
 PERSIST_DIRECTORY = os.getenv("CHROMA_PERSIST_DIRECTORY", None)
 
 # ==================== 日志配置 ====================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # ==================== 全局状态与并发保护 ====================
 rag_lock = threading.Lock()
@@ -227,11 +222,10 @@ async def add_documents(request: IndexRequest):
             metadatas = [doc.metadata for doc in request.documents]
             r.add_documents(texts, metadatas)
             stats["total_documents"] = r.document_count
-            # 注意：chunk_count 应返回实际的块数，这里简化为文档数
             return IndexResponse(
                 success=True,
                 document_count=len(request.documents),
-                chunk_count=len(request.documents),
+                chunk_count=r.document_count,
                 message=f"已添加 {len(request.documents)} 个文档"
             )
         except Exception as e:
@@ -275,7 +269,7 @@ async def query_rag(request: QueryRequest):
             original_history = r.chat_history.copy()
             r.clear_history()
         try:
-            result = r.query(request.question)
+            result = await asyncio.to_thread(r.query, request.question)
             update_stats(result["confidence"])
             return QueryResponse(
                 answer=result["answer"],
@@ -326,8 +320,9 @@ async def reset_system():
 # ==================== 启动入口 ====================
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",          
-        port=8000,
+        "main:app",
+        host="0.0.0.0",
+        port=8002,
         reload=True,
         log_level="info"
     )

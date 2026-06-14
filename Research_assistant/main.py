@@ -2,13 +2,13 @@
 智能研究助手 - FastAPI 后端
 基于 LangGraph 的多阶段研究流程：规划→收集→分析→综合→报告→质检（可迭代）
 """
-import logging
-import time
-
+import sys, os, logging, time, asyncio
 from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 
-import dotenv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import setup_logging
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,14 +18,10 @@ from pydantic import BaseModel, Field
 from research_assistant import run_research
 
 # ==================== 配置加载 ====================
-dotenv.load_dotenv()
+import dotenv; dotenv.load_dotenv()
 
 # ==================== 日志配置 ====================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # ==================== 全局状态 ====================
 stats: Dict[str, Any] = {
@@ -144,7 +140,7 @@ async def create_research(request: ResearchRequest):
     logger.info(f"收到研究请求: {request.topic}")
     try:
         # 调用研究助手的核心函数，返回结果字典
-        result = run_research(request.topic)
+        result = await asyncio.to_thread(run_research, request.topic)
         if result is None:
             raise HTTPException(status_code=500, detail="研究任务执行失败，请稍后重试。")
 
@@ -180,7 +176,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8003,
         reload=True,
         log_level="info"
     )

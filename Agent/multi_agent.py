@@ -1,15 +1,12 @@
 # %%
 # ==================== 第一部分：导入必要的库 ====================
-import os
-import re
-import json
-import logging
-import threading                                 # MODIFIED: 用于线程安全锁
+import os, sys, json, logging, threading
 from typing import List, Dict, Any, TypedDict, Literal
 from datetime import datetime
 
-import dotenv
-from langchain_openai import ChatOpenAI
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import safe_parse_json, setup_logging, ModelCache, llm_invoke_with_retry
+
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -19,45 +16,12 @@ from langchain.agents import create_agent
 
 # %%
 # ==================== 第二部分：配置日志与环境变量 ====================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-dotenv.load_dotenv()
-
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
-
-_MODEL_CACHE = None
-_MODEL_LOCK = threading.Lock()                   # MODIFIED: 模型初始化锁
-
-if not DEEPSEEK_API_KEY:
-    raise ValueError("环境变量 DEEPSEEK_API_KEY 未设置，请在 .env 文件中添加该变量。")
-if not DEEPSEEK_BASE_URL:
-    raise ValueError("环境变量 DEEPSEEK_BASE_URL 未设置，请在 .env 文件中添加该变量。")
-
+logger = setup_logging(__name__)
+_model_cache = ModelCache(temperature=0.2, max_tokens=1000)
 
 def get_model():
-    """
-    获取聊天模型的单例实例（DeepSeek Chat）。
-    使用全局缓存和线程锁，避免并发重复创建。
-    """
-    global _MODEL_CACHE
-    if _MODEL_CACHE is not None:
-        return _MODEL_CACHE
-    with _MODEL_LOCK:                            # MODIFIED: 双重检查锁定
-        if _MODEL_CACHE is not None:
-            return _MODEL_CACHE
-        _MODEL_CACHE = ChatOpenAI(
-            model="deepseek-chat",
-            temperature=0.2,
-            max_tokens=1000,
-            api_key=DEEPSEEK_API_KEY,
-            base_url=DEEPSEEK_BASE_URL
-        )
-        return _MODEL_CACHE
+    """Get the shared model instance."""
+    return _model_cache.get()
 
 
 # %%
@@ -157,31 +121,7 @@ class CustomerServiceState(TypedDict):
 
 # %%
 # ==================== 第六部分：安全JSON解析工具 ====================
-def safe_parse_json(text: str, default: dict = None) -> dict:
-    """
-    安全解析 LLM 返回的可能包含在 Markdown 代码块中的 JSON 字符串。
-    支持嵌套对象（贪婪匹配花括号内容）。
-    """
-    if default is None:
-        default = {}
-
-    content = text.strip()
-
-    # 策略1：提取 Markdown JSON 代码块
-    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
-    if json_match:
-        content = json_match.group(1).strip()
-    else:
-        # 策略2：提取第一个 { 到最后一个 } 的完整内容（支持嵌套）
-        brace_match = re.search(r'\{.*\}', content, re.DOTALL)  # MODIFIED: 贪婪匹配
-        if brace_match:
-            content = brace_match.group(0)
-
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError as e:
-        logger.warning(f"JSON 解析失败: {e}")
-        return default
+# safe_parse_json imported from shared.utils
 
 
 # %%
@@ -210,7 +150,7 @@ class IntentClassifier:
 
     def classify(self, message: str) -> Dict[str, Any]:
         chain = self.prompt | self.llm | StrOutputParser()
-        result = chain.invoke({"message": message})
+        result = llm_invoke_with_retry(chain, {"message": message})
         default_result = {"intent": "general_chat", "confidence": 0.5, "reason": "解析失败"}
         parsed = safe_parse_json(result, default_result)
         intent = parsed.get("intent", "general_chat")
@@ -266,7 +206,7 @@ class TechSupportAgent(BaseAgent):
 
     def handle(self, message: str, chat_history: List = None) -> str:
         messages = self._prepare_messages(message, chat_history)
-        result = self.agent.invoke({"messages": messages})
+        result = llm_invoke_with_retry(self.agent, {"messages": messages})
         if result.get("messages"):
             return result["messages"][-1].content
         return "抱歉，我暂时无法处理您的问题。建议联系人工客服"
@@ -295,7 +235,7 @@ class OrderServiceAgent(BaseAgent):
 
     def handle(self, message: str, chat_history: List = None) -> str:
         messages = self._prepare_messages(message, chat_history)
-        result = self.agent.invoke({"messages": messages})
+        result = llm_invoke_with_retry(self.agent, {"messages": messages})
         if result.get("messages"):
             return result["messages"][-1].content
         return "抱歉，订单查询服务暂时不可用，请稍后再试。"
@@ -325,7 +265,7 @@ class ProductConsultAgent(BaseAgent):
 
     def handle(self, message: str, chat_history: List = None) -> str:
         messages = self._prepare_messages(message, chat_history)
-        result = self.agent.invoke({"messages": messages})
+        result = llm_invoke_with_retry(self.agent, {"messages": messages})
         if result.get("messages"):
             return result["messages"][-1].content
         return "抱歉，产品信息查询暂时不可用。请稍后再试。"
@@ -358,7 +298,7 @@ class GeneralChatAgent(BaseAgent):
 
     def handle(self, message: str, chat_history: List = None) -> str:
         messages = self._prepare_messages(message, chat_history)
-        result = self.agent.invoke({"messages": messages})
+        result = llm_invoke_with_retry(self.agent, {"messages": messages})
         if result.get("messages"):
             return result["messages"][-1].content
         return "嗯...我还在学习中，你能再说一遍吗？"
@@ -390,7 +330,7 @@ class QualityChecker:
 
     def check(self, user_message: str, agent_response: str) -> Dict[str, Any]:
         chain = self.prompt | self.llm | StrOutputParser()
-        result = chain.invoke({"user_message": user_message, "agent_response": agent_response})
+        result = llm_invoke_with_retry(chain, {"user_message": user_message, "agent_response": agent_response})
         default_result = {"total_score": 60, "needs_escalation": False, "reason": "评估完成"}
         return safe_parse_json(result, default_result)
 
@@ -408,7 +348,8 @@ class CustomerServiceSystem:
         self.product_agent = ProductConsultAgent()
         self.general_agent = GeneralChatAgent()
         self.quality_checker = QualityChecker()
-        # NOTE: self.current_history 定义但未使用，属于遗留代码，未在此次修改中删除（非新引入死代码）
+        # Chat history persisted at API layer (read/written by main.py under lock).
+        # The graph operates on a snapshot passed through handle_message().
         self.current_history = []
         self.graph = self._build_graph()
 
@@ -467,6 +408,7 @@ class CustomerServiceSystem:
             logger.info("升级到人工客服")
             state["needs_escalation"] = True
             state["escalation_reason"] = "用户明确要求人工服务"
+            state["quality_score"] = 1.0
             state["agent_response"] = """非常抱歉，您的问题需要人工客服来处理。
 我已经为您转接人工客服，请稍后...
 

@@ -15,7 +15,6 @@ from langchain_core.messages import HumanMessage, AIMessage  # 人类和AI消息
 from langchain_core.output_parsers import StrOutputParser    # 字符串输出解析器，提取模型返回的纯文本
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # 提示模板和对话历史占位符
 from langchain_chroma import Chroma                           # Chroma 向量数据库客户端
-from langchain_openai import ChatOpenAI                       # OpenAI 兼容的聊天模型接口，此处对接DeepSeek
 from langchain_core.documents import Document                 # 文档对象，表示文本块及其元数据
 from langchain_text_splitters import RecursiveCharacterTextSplitter  # 递归文本分割器，用于文档切片
 from langgraph.constants import START, END                    # LangGraph 图中的特殊节点：开始和结束
@@ -474,7 +473,7 @@ class Generator:
             for msg in chat_history[-6:]
         ]
         chain = self.rewrite_prompt | self.llm | StrOutputParser()
-        return chain.invoke({"query": query, "chat_history": messages})
+        return llm_invoke_with_retry(chain, {"query": query, "chat_history": messages})
 
     def generate(self, query: str, context: str, chat_history: List[Dict[str, str]] = None) -> str:
         """
@@ -488,7 +487,7 @@ class Generator:
                     else AIMessage(content=msg["content"])
                 )
         chain = self.rag_prompt | self.llm | StrOutputParser()
-        return chain.invoke({
+        return llm_invoke_with_retry(chain, {
             "query": query,
             "chat_history": messages,
             "context": context
@@ -514,7 +513,7 @@ class Generator:
         ])
         chain = eval_prompt | self.llm | StrOutputParser()
         try:
-            response = chain.invoke({
+            response = llm_invoke_with_retry(chain, {
                 "context": context,
                 "query": query,
                 "answer": answer
@@ -614,7 +613,7 @@ class RAGChain:
         return list_persisted_collections(self.persist_directory)
 
     def add_documents(self, texts: List[str], metadatas: Optional[List[Dict[str, Any]]] = None):
-        """向现有索引增量添加文档（不重新创建索引）。"""
+        """向现有索引增量添加文档（不重新创建索引）。返回新增块数。"""
         if not self.retriever:
             raise ValueError("请先加载或创建索引")
         logger.info("增量索引：添加新文档")
@@ -622,12 +621,13 @@ class RAGChain:
         chunks = self.processor.split_documents(documents)
         if self.processor.config.deduplicate:
             chunks = self.processor.deduplicate(chunks)
-        # 生成全局唯一的文档 ID，避免重复
         ids = [str(uuid.uuid4()) for _ in range(len(chunks))]
         self.retriever.vector_store.add_documents(documents=chunks, ids=ids)
         stats = get_collection_stats(self.retriever.vector_store)
         self.document_count = stats['count']
-        logger.info(f"已添加 {len(chunks)} 个新文档块，当前总文档数: {self.document_count}")
+        chunk_count = len(chunks)
+        logger.info(f"已添加 {chunk_count} 个新文档块，当前总文档数: {self.document_count}")
+        return chunk_count
 
     def _build_graph(self):
         """

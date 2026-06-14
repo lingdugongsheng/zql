@@ -3,13 +3,13 @@
 基于 LangGraph 的意图识别、多专业 Agent 协作、质量检查与人工升级
 """
 
-import logging
-import time
-import threading
+import sys, os, logging, time, threading, asyncio
 from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 
-import dotenv
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import setup_logging
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,14 +19,10 @@ from pydantic import BaseModel, Field
 from multi_agent import CustomerServiceSystem
 
 # ==================== 配置加载 ====================
-dotenv.load_dotenv()
+import dotenv; dotenv.load_dotenv()
 
 # ==================== 日志配置 ====================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # ==================== 全局状态与并发保护 ====================
 service_lock = threading.Lock()
@@ -153,7 +149,7 @@ async def query_service(request: QueryRequest):
     
     # 执行客服处理（无锁，允许并发）
     try:
-        result = srv.handle_message(request.question, chat_history)
+        result = await asyncio.to_thread(srv.handle_message, request.question, chat_history)
     except Exception as e:
         logger.error(f"查询失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -223,7 +219,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=True,
         log_level="info"
     )
