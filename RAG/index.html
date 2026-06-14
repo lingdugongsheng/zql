@@ -131,8 +131,9 @@
             overflow: hidden;
             text-overflow: ellipsis;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;           
         }
 
         .confidence-badge {
@@ -353,7 +354,7 @@
                     请直接输入您的问题，系统将基于知识库为您提供准确答案。
                 </p>
                 <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
-                    后端地址: <code>http://localhost:8000</code>
+                    后端地址: <code>http://localhost:8002</code>
                 </p>
             </div>
         </div>
@@ -380,7 +381,7 @@
 
     <script>
         // ==================== 配置 ====================
-        const API_BASE_URL = 'http://localhost:8000';
+        const API_BASE_URL = 'http://localhost:8002';
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendMessageBtn = document.getElementById('send-message');

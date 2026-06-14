@@ -33,9 +33,9 @@ rag_config = RAGConfig()
 
 stats: Dict[str, Any] = {
     "total_queries": 0,
-    "total_documents": 0,
+    "total_documents": 0,        # 原始文档总数（非分块数）
     "last_query_time": None,
-    "confidences": []          # 最多保存 100 条置信度数据
+    "confidences": []            # 最多保存 100 条置信度数据
 }
 
 # ==================== 应用生命周期 ====================
@@ -92,8 +92,8 @@ class IndexRequest(BaseModel):
 
 class IndexResponse(BaseModel):
     success: bool
-    document_count: int
-    chunk_count: int
+    document_count: int           # 原始文档数
+    chunk_count: int              # 分块后的块数
     message: str
 
 class QueryRequest(BaseModel):
@@ -120,7 +120,7 @@ class StatsResponse(BaseModel):
     total_queries: int
     average_confidence: float
     last_query_time: Optional[str]
-    document_count: int
+    document_count: int            # 原始文档总数
 
 # ==================== 工具函数 ====================
 def get_rag() -> RAGChain:
@@ -175,7 +175,8 @@ async def index_documents(request: IndexRequest):
             texts = [doc.text for doc in request.documents]
             metadatas = [doc.metadata for doc in request.documents]
             r.index_documents(texts, metadatas, collection_name=request.collection_name)
-            stats["total_documents"] = r.document_count  # 同步文档总数
+            # 统计原始文档数
+            stats["total_documents"] = len(request.documents)
             return IndexResponse(
                 success=True,
                 document_count=len(request.documents),
@@ -193,12 +194,11 @@ async def index_sample_documents():
     with rag_lock:
         r = get_rag()
         try:
-            # 将 clear_history 放入 try 块，避免异常时影响后续操作
             r.clear_history()
             texts = [doc["text"] for doc in SAMPLE_DOCUMENTS]
             metadatas = [doc["metadata"] for doc in SAMPLE_DOCUMENTS]
             r.index_documents(texts, metadatas, collection_name="default")
-            stats["total_documents"] = r.document_count
+            stats["total_documents"] = len(SAMPLE_DOCUMENTS)
             return IndexResponse(
                 success=True,
                 document_count=len(SAMPLE_DOCUMENTS),
@@ -221,7 +221,8 @@ async def add_documents(request: IndexRequest):
             texts = [doc.text for doc in request.documents]
             metadatas = [doc.metadata for doc in request.documents]
             r.add_documents(texts, metadatas)
-            stats["total_documents"] = r.document_count
+            # 累加原始文档数
+            stats["total_documents"] += len(request.documents)
             return IndexResponse(
                 success=True,
                 document_count=len(request.documents),
@@ -251,7 +252,7 @@ async def delete_collection(collection_name: str):
             raise HTTPException(status_code=400, detail="内存模式下不支持删除集合")
         try:
             r.delete_collection(collection_name)
-            # 简化处理：清零文档计数（实际应减去被删除集合的文档数）
+            # 无法精确计算剩余文档数，故置零
             stats["total_documents"] = 0
             return {"message": f"集合 '{collection_name}' 已删除", "success": True}
         except Exception as e:
@@ -264,7 +265,6 @@ async def query_rag(request: QueryRequest):
     with rag_lock:
         r = get_rag()
         original_history = None
-        # 如果不使用历史，备份并清空
         if not request.use_history:
             original_history = r.chat_history.copy()
             r.clear_history()
@@ -281,7 +281,6 @@ async def query_rag(request: QueryRequest):
             logger.error(f"查询失败: {e}")
             raise HTTPException(status_code=500, detail=str(e))
         finally:
-            # 确保无论成功或失败，历史都能恢复
             if original_history is not None:
                 r.chat_history = original_history
 
