@@ -166,7 +166,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 ```bash
 # 启动客服系统 API
-cd Agent && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+cd Agent && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 # 或运行各子系统 Demo
 cd Agent && python multi_agent.py
@@ -180,24 +180,28 @@ cd Research_assistant && python research_assistant.py
 
 ```
 AI/
-├── Agent/                   # 多代理智能客服系统
+├── shared/                  # 公共模块
+│   ├── utils.py             #   safe_parse_json, setup_logging
+│   └── llm.py               #   ModelCache, llm_invoke_with_retry
+├── Agent/                   # 多代理智能客服 (端口 8001)
 │   ├── multi_agent.py
 │   ├── main.py
 │   └── index.html
-├── RAG/                     # RAG 智能问答系统
+├── RAG/                     # RAG 智能问答 (端口 8002)
 │   ├── rag.py
 │   ├── main.py
 │   └── index.html
-├── Research_assistant/     # 智能研究助手
+├── Research_assistant/     # 智能研究助手 (端口 8003)
 │   ├── research_assistant.py
 │   ├── main.py
 │   └── index.html
-├── .env                     # 环境变量配置
+├── tests/                   # 测试
+├── .env.example             # 环境变量模板
 ├── requirements.txt         # 依赖列表
 └── README.md                # 本文件
 ```
 
-每个子系统配有独立的 README 文件，包含详细的架构图、API 文档和设计说明。
+每个子系统配有独立的前端界面（index.html），API 文档通过 /docs 端点访问。
 
 ---
 
