@@ -1,688 +1,606 @@
-<!-- 文档类型声明，告诉浏览器使用 HTML5 标准解析页面 -->
 <!DOCTYPE html>
-<!-- 网页根元素，lang="zh-CN" 表示页面主要内容为简体中文，辅助搜索引擎和屏幕阅读器 -->
 <html lang="zh-CN">
 <head>
-    <!-- 字符编码设置为 UTF-8，支持中文、英文、emoji 等几乎所有文字 -->
     <meta charset="UTF-8">
-    <!-- 视口设置，让页面宽度适配设备宽度，初始缩放为 1，适用于移动端 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 浏览器标签页上显示的标题 -->
-    <title>RAG智能问答</title>
-    <!-- 引入 Font Awesome 6.4.0 图标库，从 CDN 加载，可以使用各种矢量图标 -->
+    <title>RAG 智能问答 · 专业版</title>
+    <!-- Font Awesome 6 图标库 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- 内部样式表，开始定义页面样式 -->
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
-        /* ===== 全局重置：去掉所有元素的默认外边距、内边距，并统一盒模型 ===== */
+        :root {
+            /* 加深后的蓝色调色板 */
+            --blue-50: #e8f0fe;
+            --blue-100: #cce0ff;
+            --blue-200: #a3c7ff;
+            --blue-300: #7aadff;
+            --blue-400: #4f94f5;
+            --blue-500: #2b6ed7;
+            --blue-600: #1a56b8;
+            --blue-700: #13449e;
+            --blue-800: #0f3585;
+            --blue-900: #0a2761;
+            --glass-bg: rgba(255, 255, 255, 0.22);
+            --glass-border: rgba(255, 255, 255, 0.45);
+            --glass-shadow: 0 8px 32px rgba(15, 35, 85, 0.2);
+            --radius-xl: 24px;
+            --radius-lg: 18px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
-            /* box-sizing: border-box 让元素的宽高包含 padding 和 border，方便尺寸控制 */
             box-sizing: border-box;
-            /* 全局字体，优先使用 Segoe UI，回退到微软雅黑和无衬线字体 */
-            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
         }
 
-        /* ===== 页面主体样式 ===== */
         body {
-            /* 背景使用线性渐变，从浅蓝到更浅蓝，角度 135 度（左下到右上） */
-            background: linear-gradient(135deg, #e6f7ff 0%, #b3e0ff 100%);
-            /* 最小高度占满整个视口 */
+            /* 加深背景渐变，从浅蓝到更深的蓝 */
+            background: linear-gradient(135deg, #c9e4ff 0%, #9bc9ff 40%, #5a9ef0 100%);
             min-height: 100vh;
-            /* 使用弹性布局，让子元素居中 */
             display: flex;
-            /* 水平居中 */
             justify-content: center;
-            /* 垂直居中 */
             align-items: center;
-            /* 内边距，防止小屏幕上贴边 */
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
 
-        /* ===== 聊天卡片容器 ===== */
-        .chat-container {
-            /* 宽度占满父容器，但最大不超过 800px */
+        /* 动态背景光晕也相应加深 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -20%;
+            left: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(43, 110, 215, 0.3) 0%, transparent 70%);
+            z-index: 0;
+            animation: floatBg 20s ease-in-out infinite alternate;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -20%;
+            right: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(26, 86, 184, 0.25) 0%, transparent 70%);
+            z-index: 0;
+            animation: floatBg 25s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes floatBg {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        #app {
+            position: relative;
+            z-index: 1;
             width: 100%;
-            max-width: 800px;
-            /* 白色背景 */
-            background: white;
-            /* 圆角 */
-            border-radius: 20px;
-            /* 蓝色半透明阴影，营造浮起感 */
-            box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2);
-            /* 隐藏溢出内容，保证圆角裁剪 */
-            overflow: hidden;
-            /* 内部使用弹性列布局 */
-            display: flex;
-            flex-direction: column;
-            /* 高度为视口高度的 80% */
-            height: 80vh;
+            max-width: 860px;
+            height: 85vh;
         }
 
-        /* ===== 顶部标题栏 ===== */
+        .chat-container {
+            width: 100%;
+            height: 100%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--glass-shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all var(--transition);
+        }
+
         .chat-header {
-            /* 蓝色渐变背景 */
-            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            font-size: 1.3rem;
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.28);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 16px 24px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            /* 子元素（图标和文字）之间的间距 */
-            gap: 12px;
-            /* 底部轻微阴影 */
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            gap: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+            color: var(--blue-800);
+            font-weight: 700;
+            font-size: 1.3rem;
+            letter-spacing: -0.3px;
         }
-
-        /* 头部内图标放大一点 */
         .chat-header i {
-            font-size: 1.5rem;
+            font-size: 1.7rem;
+            color: var(--blue-600);
+            filter: drop-shadow(0 2px 6px rgba(26,86,184,0.4));
         }
 
-        /* ===== 消息展示区域 ===== */
         .chat-messages {
-            /* 占据剩余空间（flex: 1） */
             flex: 1;
-            padding: 20px;
-            /* 内容溢出时纵向滚动 */
+            padding: 24px 20px 16px;
             overflow-y: auto;
-            /* 浅灰蓝背景 */
-            background: #f9fbfd;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             display: flex;
             flex-direction: column;
-            /* 消息之间的垂直间距 */
-            gap: 15px;
+            gap: 20px;
+            scroll-behavior: smooth;
         }
 
-        /* ===== 单条消息气泡（通用） ===== */
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--blue-400); border-radius: 3px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: var(--blue-500); }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--blue-800);
+            margin: auto;
+        }
+        .welcome-icon {
+            font-size: 4rem;
+            color: var(--blue-500);
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+            filter: drop-shadow(0 10px 15px rgba(26,86,184,0.3));
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, var(--blue-700), var(--blue-500));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .welcome-text {
+            font-size: 1rem;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .message-list-enter-active {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .message-list-leave-active {
+            transition: all 0.2s ease-in;
+        }
+        .message-list-enter-from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+        }
+        .message-list-leave-to {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
         .message {
-            /* 最大宽度为 85%，避免撑满 */
-            max-width: 85%;
-            padding: 14px 18px;
-            /* 圆角气泡 */
-            border-radius: 16px;
-            /* 行高增加可读性 */
+            max-width: 80%;
+            padding: 14px 20px;
+            border-radius: var(--radius-lg);
             line-height: 1.6;
             position: relative;
-            /* 淡入动画 */
-            animation: fadeIn 0.3s ease;
+            word-break: break-word;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            transition: box-shadow 0.2s;
+        }
+        .message:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
         }
 
-        /* 淡入动画：从下方 10px 透明渐变到原位不透明 */
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* ===== 用户消息气泡（蓝色，靠右） ===== */
         .user-message {
-            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-            color: white;
-            /* 自身靠右对齐 */
             align-self: flex-end;
-            /* 右下角稍尖，模拟气泡尾巴 */
-            border-bottom-right-radius: 4px;
+            background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
+            color: white;
+            border-bottom-right-radius: 6px;
+            box-shadow: 0 6px 18px rgba(26,86,184,0.35);
+            margin-left: 15%;
         }
 
-        /* ===== AI 消息气泡（白色，靠左） ===== */
         .ai-message {
-            background: white;
-            color: #333;
-            /* 自身靠左对齐 */
             align-self: flex-start;
-            border: 1px solid #e8f0fe;
-            /* 左下角稍尖 */
-            border-bottom-left-radius: 4px;
-            /* 轻微阴影 */
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.75);
+            color: #1e293b;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            margin-right: 15%;
         }
 
-        /* 消息内容：保留换行和空格，长单词自动断行 */
         .message-content {
             white-space: pre-wrap;
-            word-wrap: break-word;
+            font-size: 0.95rem;
+            line-height: 1.65;
         }
 
-        /* ===== 来源信息区域 ===== */
         .sources {
-            margin-top: 12px;
-            padding-top: 10px;
-            /* 上边框分隔 */
-            border-top: 1px solid #e8f0fe;
-            font-size: 0.85rem;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(0,0,0,0.06);
+            font-size: 0.8rem;
         }
 
-        /* 单个来源项 */
         .source-item {
-            background: #f0f7ff;
-            padding: 8px 12px;
-            border-radius: 8px;
-            margin: 6px 0;
-            /* 左侧蓝色边框作为强调 */
-            border-left: 3px solid #1677ff;
+            background: rgba(255,255,255,0.65);
+            backdrop-filter: blur(4px);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            margin: 8px 0;
+            border-left: 3px solid var(--blue-600);
+            transition: all 0.2s;
         }
-
-        /* 来源标题 */
+        .source-item:hover {
+            background: rgba(255,255,255,0.85);
+            transform: translateX(2px);
+        }
         .source-title {
             font-weight: 600;
-            color: #1677ff;
+            color: var(--blue-700);
             margin-bottom: 4px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-
-        /* 来源内容预览，最多显示 2 行，超出显示省略号 */
         .source-content {
-            color: #666;
-            font-size: 0.85rem;
+            color: #475569;
+            font-size: 0.8rem;
             overflow: hidden;
-            text-overflow: ellipsis;
-            /* 使用 -webkit-box 实现多行省略 */
             display: -webkit-box;
             -webkit-box-orient: vertical;
             -webkit-line-clamp: 2;
-            /* 标准属性（部分浏览器支持） */
             line-clamp: 2;
         }
 
-        /* ===== 置信度标签 ===== */
         .confidence-badge {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            backdrop-filter: blur(4px);
         }
+        .confidence-high { background: rgba(217, 247, 190, 0.75); color: #14532d; }
+        .confidence-medium { background: rgba(254, 243, 199, 0.75); color: #78350f; }
+        .confidence-low { background: rgba(254, 226, 226, 0.75); color: #7f1d1d; }
 
-        /* 高置信度：绿色 */
-        .confidence-high {
-            background: #d9f7be;
-            color: #52c41a;
-        }
-
-        /* 中置信度：橙色 */
-        .confidence-medium {
-            background: #fff7e6;
-            color: #fa8c16;
-        }
-
-        /* 低置信度：红色 */
-        .confidence-low {
-            background: #fff1f0;
-            color: #ff4d4f;
-        }
-
-        /* ===== 底部输入区域 ===== */
         .chat-input-area {
-            padding: 15px 20px;
-            background: white;
-            border-top: 1px solid #e8f0fe;
+            padding: 16px 20px 20px;
+            background: rgba(255,255,255,0.28);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255,255,255,0.5);
         }
 
         .chat-input {
             display: flex;
-            gap: 10px;
-            background: #f9fbfd;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+            gap: 12px;
+            background: rgba(255,255,255,0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 30px;
+            padding: 4px 4px 4px 20px;
+            box-shadow: 0 4px 16px rgba(15,35,85,0.12);
+            border: 1px solid rgba(255,255,255,0.65);
+            transition: all var(--transition);
+        }
+        .chat-input:focus-within {
+            box-shadow: 0 4px 20px rgba(26,86,184,0.3);
+            border-color: var(--blue-300);
         }
 
-        /* 文本输入框 */
         #message-input {
-            /* 占据剩余空间 */
             flex: 1;
             border: none;
-            padding: 14px 18px;
-            font-size: 1rem;
-            /* 移除聚焦时的默认轮廓 */
+            padding: 12px 0;
+            font-size: 0.95rem;
             outline: none;
-            /* 禁止手动拖动调整大小 */
             resize: none;
             background: transparent;
-            color: #333;
+            color: #0f172a;
+            max-height: 120px;
         }
+        #message-input::placeholder { color: #64748b; }
 
-        /* 占位符文字颜色 */
-        #message-input::placeholder {
-            color: #999;
-        }
-
-        /* 输入框获得焦点时，添加淡蓝色光晕 */
-        #message-input:focus {
-            box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
-        }
-
-        /* 发送按钮 */
         .send-btn {
-            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
             color: white;
             border: none;
-            width: 50px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            /* 鼠标变成手型 */
             cursor: pointer;
-            font-size: 1.1rem;
-            /* 过渡动画，使悬停效果平滑 */
-            transition: all 0.2s;
-            border-radius: 16px;
-        }
-
-        /* 发送按钮悬停效果 */
-        .send-btn:hover {
-            background: linear-gradient(135deg, #0958d9 0%, #003eb3 100%);
-            /* 稍微放大 */
-            transform: scale(1.05);
-        }
-
-        /* 发送按钮禁用状态（无输入时） */
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* ===== 加载提示区域 ===== */
-        .loading-indicator {
-            text-align: center;
-            padding: 10px;
-            color: #1677ff;
-            font-size: 0.9rem;
-        }
-
-        /* 旋转加载圈 */
-        .spinner {
-            border: 2px solid rgba(22, 119, 255, 0.3);
-            border-top: 2px solid #1677ff;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            /* 无限旋转动画 */
-            animation: spin 1s linear infinite;
-            margin: 0 auto 8px;
-        }
-
-        /* 旋转动画关键帧 */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* ===== 欢迎界面 ===== */
-        .welcome-message {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
-
-        .welcome-icon {
-            font-size: 3.5rem;
-            color: #1677ff;
-            margin-bottom: 20px;
-            /* 呼吸灯动画 */
-            animation: pulse 2s infinite;
-        }
-
-        /* 呼吸动画：大小在 1 倍和 1.1 倍之间循环 */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .welcome-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #1677ff;
-            margin-bottom: 12px;
-        }
-
-        .welcome-text {
             font-size: 1rem;
-            color: #666;
-            margin-bottom: 20px;
-            line-height: 1.6;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(26,86,184,0.4);
+            flex-shrink: 0;
+        }
+        .send-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--blue-800), var(--blue-700));
+            transform: scale(1.08);
+            box-shadow: 0 6px 18px rgba(15,53,133,0.5);
+        }
+        .send-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+            filter: grayscale(0.3);
         }
 
-        /* ===== 底部状态栏 ===== */
-        .status-bar {
-            background: #f0f7ff;
-            padding: 8px 15px;
-            text-align: center;
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 8px 0;
+            color: var(--blue-700);
             font-size: 0.85rem;
-            color: #666;
-            border-top: 1px solid #e8f0fe;
+            margin-top: 6px;
+        }
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--blue-200);
+            border-top: 2px solid var(--blue-600);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-bar {
+            background: rgba(255,255,255,0.22);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 8px 24px;
+            text-align: right;
+            font-size: 0.75rem;
+            color: #334155;
+            border-top: 1px solid rgba(255,255,255,0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-connected { color: #14532d; font-weight: 600; }
+        .status-disconnected { color: #7f1d1d; font-weight: 600; }
+
+        .clear-btn {
+            background: none;
+            border: none;
+            color: #475569;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+        .clear-btn:hover {
+            background: rgba(255,255,255,0.55);
+            color: var(--blue-700);
         }
 
-        /* 已连接状态：绿色 */
-        .status-connected {
-            color: #52c41a;
-        }
-
-        /* 未连接状态：红色 */
-        .status-disconnected {
-            color: #ff4d4f;
-        }
-
-        /* ===== 自定义滚动条（Webkit 浏览器） ===== */
-        .chat-messages::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .chat-messages::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: #1677ff;
-            border-radius: 4px;
-        }
-
-        .chat-messages::-webkit-scrollbar-thumb:hover {
-            background: #0958d9;
-        }
-
-        /* ===== 响应式设计：当屏幕宽度 ≤ 768px 时 ===== */
         @media (max-width: 768px) {
-            .chat-container {
-                /* 高度更高，占 90% 视口 */
-                height: 90vh;
-                max-width: 100%;
-                border-radius: 16px;
-            }
-
-            .message {
-                /* 气泡更宽 */
-                max-width: 95%;
-            }
-
-            .chat-header {
-                font-size: 1.1rem;
-                padding: 15px;
-            }
-
-            .welcome-icon {
-                font-size: 2.5rem;
-            }
-
-            .welcome-title {
-                font-size: 1.5rem;
-            }
+            .chat-container { height: 90vh; border-radius: var(--radius-lg); }
+            .message { max-width: 90%; }
+            .chat-header { padding: 12px 16px; font-size: 1.1rem; }
         }
     </style>
 </head>
 <body>
-    <!-- 聊天卡片最外层容器 -->
-    <div class="chat-container">
-        <!-- 顶部标题栏：图标 + 文字 -->
-        <div class="chat-header">
-            <!-- 大脑图标（Font Awesome） -->
-            <i class="fas fa-brain"></i>
-            <span>RAG 智能问答系统</span>
-        </div>
+    <div id="app">
+        <div class="chat-container">
+            <!-- 头部 -->
+            <div class="chat-header">
+                <i class="fas fa-brain"></i>
+                <span>RAG 智能问答系统</span>
+            </div>
 
-        <!-- 消息展示区域，动态添加的消息都会放入这个 div -->
-        <div class="chat-messages" id="chat-messages">
-            <!-- 初始欢迎界面，首次打开时显示，开始聊天后会被移除 -->
-            <div class="welcome-message">
-                <div class="welcome-icon">
-                    <i class="fas fa-robot"></i> <!-- 机器人图标 -->
+            <!-- 消息区域（带过渡动画） -->
+            <div class="chat-messages" ref="chatMessages">
+                <div v-if="messages.length === 0" class="welcome-message">
+                    <div class="welcome-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h2 class="welcome-title">欢迎使用 RAG 智能问答</h2>
+                    <p class="welcome-text">
+                        基于 LangChain + LangGraph 构建<br>
+                        输入您的问题，即刻获取精准答案
+                    </p>
+                    <p class="welcome-text" style="font-size:0.8rem; color:#475569;">
+                        后端地址: <code>http://localhost:8002</code>
+                    </p>
                 </div>
-                <h2 class="welcome-title">欢迎使用 RAG 智能问答</h2>
-                <p class="welcome-text">
-                    这是一个基于 LangChain 和 LangGraph 的智能问答系统。<br>
-                    请直接输入您的问题，系统将基于知识库为您提供准确答案。
-                </p>
-                <p class="welcome-text" style="font-size: 0.85rem; color: #999;">
-                    <!-- 显示后端地址，方便调试 -->
-                    后端地址: <code>http://localhost:8002</code>
-                </p>
-            </div>
-        </div>
 
-        <!-- 底部输入区域 -->
-        <div class="chat-input-area">
-            <!-- 输入框和发送按钮的横向容器 -->
-            <div class="chat-input">
-                <!-- 多行文本输入框，初始 1 行，JS 会自动调整高度 -->
-                <textarea id="message-input"
-                          placeholder="请输入您的问题... "
-                          rows="1"></textarea>
-                <!-- 发送按钮，初始状态为禁用（因为没有内容） -->
-                <button class="send-btn" id="send-message" disabled>
-                    <i class="fas fa-paper-plane"></i> <!-- 纸飞机图标 -->
+                <TransitionGroup name="message-list">
+                    <div v-for="msg in messages" :key="msg.id"
+                         :class="['message', msg.isUser ? 'user-message' : 'ai-message']">
+                        <div class="message-content" v-html="msg.content.replace(/\n/g, '<br>')"></div>
+                        
+                        <div v-if="!msg.isUser && (msg.sources.length || msg.confidence)" class="sources">
+                            <span v-if="msg.confidence" :class="['confidence-badge', confidenceClass(msg.confidence)]">
+                                <i class="fas fa-chart-simple"></i> 置信度 {{ (msg.confidence * 100).toFixed(0) }}%
+                            </span>
+                            <div v-for="(source, idx) in msg.sources" :key="idx" class="source-item">
+                                <div class="source-title">
+                                    <i class="fas fa-file-lines"></i> 来源 {{ idx + 1 }} · {{ source.source || '文档片段' }}
+                                </div>
+                                <div class="source-content">{{ source.content_preview || source.text || '' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </TransitionGroup>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="chat-input-area">
+                <div class="chat-input">
+                    <textarea id="message-input"
+                              v-model="question"
+                              @keydown.enter.exact.prevent="sendQuery"
+                              placeholder="输入你的问题…"
+                              rows="1"
+                              ref="inputEl"></textarea>
+                    <button class="send-btn" :disabled="!canSend" @click="sendQuery" title="发送">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div v-if="isLoading" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <span>AI 正在深度思考…</span>
+                </div>
+            </div>
+
+            <!-- 状态栏 + 清除对话 -->
+            <div class="status-bar">
+                <button v-if="messages.length > 0" class="clear-btn" @click="clearChat">
+                    <i class="fas fa-broom"></i> 清空对话
                 </button>
+                <span v-else></span>
+                <span>
+                    <i class="fas fa-circle" style="font-size:0.5rem; vertical-align:middle;"
+                       :class="connectionOk ? 'status-connected' : 'status-disconnected'"></i>
+                    API: <span :class="connectionOk ? 'status-connected' : 'status-disconnected'">
+                        {{ connectionOk ? '已连接' : '未连接' }}
+                    </span>
+                </span>
             </div>
-            <!-- 加载提示区，默认隐藏，发送请求时显示 -->
-            <div class="loading-indicator" id="loading-indicator" style="display: none;">
-                <div class="spinner"></div> <!-- 旋转加载圈 -->
-                <div>AI 正在思考中...</div>
-            </div>
-        </div>
-
-        <!-- 底部状态栏：显示 API 连接状态 -->
-        <div class="status-bar">
-            <span id="api-status">API状态: <span class="status-disconnected">未连接</span></span>
         </div>
     </div>
 
     <script>
-        // ==================== 配置 ====================
-        // 后端 API 的基础地址，此处为本地 8002 端口
-        const API_BASE_URL = 'http://localhost:8002';
-        // 获取消息容器元素
-        const chatMessages = document.getElementById('chat-messages');
-        // 获取输入框元素
-        const messageInput = document.getElementById('message-input');
-        // 获取发送按钮元素
-        const sendMessageBtn = document.getElementById('send-message');
-        // 获取加载指示器元素
-        const loadingIndicator = document.getElementById('loading-indicator');
-        // 获取状态栏中显示 API 状态的 span 元素
-        const apiStatusEl = document.getElementById('api-status');
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
-        // 标志位，表示当前是否正在等待 API 响应，防止重复发送请求
-        let isLoading = false;
+        createApp({
+            setup() {
+                const API_BASE_URL = 'http://localhost:8002';
+                const messages = ref([]);
+                const question = ref('');
+                const isLoading = ref(false);
+                const connectionOk = ref(false);
+                const chatMessages = ref(null);
+                const inputEl = ref(null);
 
-        // ==================== 工具函数 ====================
+                const canSend = computed(() => question.value.trim() !== '' && !isLoading.value);
 
-        // 显示加载状态：显示加载动画，禁用发送按钮和输入框
-        function showLoading() {
-            isLoading = true;
-            loadingIndicator.style.display = 'block';   // 显示加载提示
-            sendMessageBtn.disabled = true;             // 禁用发送按钮
-            messageInput.disabled = true;               // 禁用输入框
-        }
+                const confidenceClass = (confidence) => {
+                    if (confidence >= 0.8) return 'confidence-high';
+                    if (confidence >= 0.6) return 'confidence-medium';
+                    return 'confidence-low';
+                };
 
-        // 隐藏加载状态：隐藏加载动画，恢复发送按钮和输入框
-        function hideLoading() {
-            isLoading = false;
-            loadingIndicator.style.display = 'none';    // 隐藏加载提示
-            sendMessageBtn.disabled = false;            // 恢复发送按钮
-            messageInput.disabled = false;              // 恢复输入框
-        }
+                const addMessage = (content, isUser = false, sources = [], confidence = 0) => {
+                    messages.value.push({
+                        id: Date.now() + Math.random(),
+                        content,
+                        isUser,
+                        sources,
+                        confidence
+                    });
+                    nextTick(() => {
+                        if (chatMessages.value) {
+                            chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+                        }
+                    });
+                };
 
-        // 向消息区添加一条消息气泡
-        // content: 消息文本
-        // isUser: 是否为用户消息（true 则显示为蓝色靠右，false 则为白色靠左 AI 消息）
-        // sources: 来源数组，每个元素包含 source, content_preview 等
-        // confidence: 置信度数值（0-1）
-        function addMessage(content, isUser = false, sources = [], confidence = 0) {
-            // 如果当前消息区只有欢迎界面，则清空欢迎界面
-            if (chatMessages.children.length === 1 &&
-                chatMessages.firstElementChild.classList.contains('welcome-message')) {
-                chatMessages.innerHTML = '';
-            }
+                const showError = (errorText) => {
+                    addMessage(`❌ ${errorText}`, false, [], 0);
+                };
 
-            // 创建一个 div 作为消息气泡
-            const messageDiv = document.createElement('div');
-            // 根据 isUser 添加不同的 class
-            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+                const clearChat = () => {
+                    messages.value = [];
+                };
 
-            if (!isUser) {
-                // AI 消息：显示回答内容、来源和置信度
-                // 将换行符替换为 <br> 以便在 HTML 中显示换行
-                messageDiv.innerHTML = `
-                    <div class="message-content">${content.replace(/\n/g, '<br>')}</div>
-                    ${sources.length > 0 || confidence > 0 ? `
-                        <div class="sources">
-                            ${confidence > 0 ? `
-                                <span class="confidence-badge ${getConfidenceClass(confidence)}">
-                                    置信度: ${(confidence * 100).toFixed(0)}%
-                                </span>
-                            ` : ''}
-                            ${sources.map((source, index) => `
-                                <div class="source-item">
-                                    <div class="source-title">来源 [${index + 1}] ${source.source || 'unknown'}</div>
-                                    <div class="source-content">${source.content_preview || source.text || ''}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                `;
-            } else {
-                // 用户消息：简单显示内容
-                messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
-            }
+                const autoResize = () => {
+                    if (inputEl.value) {
+                        inputEl.value.style.height = 'auto';
+                        inputEl.value.style.height = inputEl.value.scrollHeight + 'px';
+                    }
+                };
 
-            // 将消息气泡添加到消息容器末尾
-            chatMessages.appendChild(messageDiv);
-            // 滚动到最底部，显示最新消息
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+                const checkApiConnection = async () => {
+                    try {
+                        const resp = await fetch(`${API_BASE_URL}/health`);
+                        connectionOk.value = resp.ok;
+                    } catch {
+                        connectionOk.value = false;
+                    }
+                };
 
-        // 根据置信度数值返回对应的 CSS 类名（用于颜色区分）
-        function getConfidenceClass(confidence) {
-            if (confidence >= 0.8) return 'confidence-high';    // 高置信度：绿色
-            if (confidence >= 0.6) return 'confidence-medium';  // 中置信度：橙色
-            return 'confidence-low';                            // 低置信度：红色
-        }
+                const sendQuery = async () => {
+                    const q = question.value.trim();
+                    if (!q || isLoading.value) return;
 
-        // 在消息区显示一条红色错误消息
-        function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'message ai-message';  // 使用 AI 消息样式
-            errorDiv.innerHTML = `<div class="message-content" style="color: #ff4d4f;">❌ ${message}</div>`;
-            chatMessages.appendChild(errorDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+                    addMessage(q, true);
+                    question.value = '';
+                    isLoading.value = true;
 
-        // ==================== API 调用 ====================
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/query`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ question: q, use_history: true })
+                        });
+                        if (!response.ok) {
+                            const err = await response.json();
+                            throw new Error(err.detail || `服务器错误 (${response.status})`);
+                        }
+                        const data = await response.json();
+                        addMessage(data.answer, false, data.sources || [], data.confidence || 0);
+                    } catch (error) {
+                        showError(`查询失败: ${error.message}`);
+                    } finally {
+                        isLoading.value = false;
+                        nextTick(() => {
+                            if (inputEl.value) inputEl.value.style.height = 'auto';
+                        });
+                    }
+                };
 
-        // 检测后端 API 连接状态
-        async function checkApiConnection() {
-            try {
-                // 调用 /health 端点
-                const response = await fetch(`${API_BASE_URL}/health`);
-                if (response.ok) {
-                    // 如果响应正常，更新状态为“已连接”
-                    apiStatusEl.innerHTML = 'API状态: <span class="status-connected">已连接</span>';
-                    return true;
-                }
-            } catch (error) {
-                // 网络错误或其他异常，更新状态为“连接失败”
-                apiStatusEl.innerHTML = 'API状态: <span class="status-disconnected">连接失败</span>';
-                console.error('API 连接失败:', error);
-                return false;
-            }
-        }
-
-        // 发送用户查询到后端
-        async function sendQuery() {
-            // 获取输入框内容并去除首尾空格
-            const question = messageInput.value.trim();
-            // 如果内容为空或正在加载中，不执行
-            if (!question || isLoading) return;
-
-            // 先添加用户消息到聊天区
-            addMessage(question, true);
-            // 清空输入框
-            messageInput.value = '';
-            // 重置输入框高度
-            messageInput.style.height = 'auto';
-            // 显示加载动画
-            showLoading();
-
-            try {
-                // 发送 POST 请求到 /query 端点
-                const response = await fetch(`${API_BASE_URL}/query`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        question: question,
-                        use_history: true   // 使用对话历史进行多轮对话
-                    })
+                onMounted(async () => {
+                    await checkApiConnection();
+                    setTimeout(() => inputEl.value?.focus(), 300);
                 });
 
-                // 如果响应状态码不是 2xx，抛出错误
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-                }
+                watch(question, () => nextTick(autoResize));
 
-                // 解析 JSON 响应
-                const data = await response.json();
-
-                // 添加 AI 回复消息，带上来源和置信度
-                addMessage(data.answer, false, data.sources, data.confidence);
-            } catch (error) {
-                // 显示错误消息
-                showError(`查询失败: ${error.message}`);
-                console.error('查询错误:', error);
-            } finally {
-                // 无论成功还是失败，都要隐藏加载状态
-                hideLoading();
+                return {
+                    messages,
+                    question,
+                    isLoading,
+                    connectionOk,
+                    chatMessages,
+                    inputEl,
+                    canSend,
+                    sendQuery,
+                    confidenceClass,
+                    clearChat,
+                };
             }
-        }
-
-        // ==================== 事件监听 ====================
-
-        // 等 DOM 结构加载完成后执行
-        document.addEventListener('DOMContentLoaded', async function() {
-            // 先检查后端 API 连接状态
-            await checkApiConnection();
-
-            // 绑定发送按钮的点击事件
-            sendMessageBtn.addEventListener('click', sendQuery);
-
-            // 绑定键盘事件：Enter 发送，Shift+Enter 换行
-            messageInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {   // 按下 Enter 且没有按 Shift
-                    e.preventDefault();                  // 阻止默认的换行行为
-                    if (!e.ctrlKey) {                   // 如果没有按 Ctrl 键（避免冲突）
-                        sendQuery();                    // 发送消息
-                    }
-                }
-            });
-
-            // 输入内容变化时，自动调整输入框高度，并控制发送按钮的可用状态
-            messageInput.addEventListener('input', function() {
-                // 先将高度重置为 auto，以便获取正确的 scrollHeight
-                this.style.height = 'auto';
-                // 设置高度为内容实际高度，实现自动扩展
-                this.style.height = (this.scrollHeight) + 'px';
-                // 如果输入框为空，则禁用发送按钮，否则启用
-                sendMessageBtn.disabled = this.value.trim() === '';
-            });
-
-            // 延迟 300 毫秒后让输入框自动获得焦点，方便用户直接输入
-            setTimeout(() => {
-                messageInput.focus();
-            }, 300);
-        });
+        }).mount('#app');
     </script>
 </body>
 </html>
