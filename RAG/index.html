@@ -10,20 +10,19 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         :root {
-            /* 加深后的蓝色调色板 */
-            --blue-50: #e8f0fe;
-            --blue-100: #cce0ff;
-            --blue-200: #a3c7ff;
-            --blue-300: #7aadff;
-            --blue-400: #4f94f5;
-            --blue-500: #2b6ed7;
-            --blue-600: #1a56b8;
-            --blue-700: #13449e;
-            --blue-800: #0f3585;
-            --blue-900: #0a2761;
-            --glass-bg: rgba(255, 255, 255, 0.22);
-            --glass-border: rgba(255, 255, 255, 0.45);
-            --glass-shadow: 0 8px 32px rgba(15, 35, 85, 0.2);
+            --blue-50: #eef5ff;
+            --blue-100: #dbeafe;
+            --blue-200: #bfdbfe;
+            --blue-300: #93c5fd;
+            --blue-400: #60a5fa;
+            --blue-500: #3b82f6;
+            --blue-600: #2563eb;
+            --blue-700: #1d4ed8;
+            --blue-800: #1e40af;
+            --blue-900: #1e3a8a;
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
             --radius-xl: 24px;
             --radius-lg: 18px;
             --radius-md: 14px;
@@ -39,8 +38,7 @@
         }
 
         body {
-            /* 加深背景渐变，从浅蓝到更深的蓝 */
-            background: linear-gradient(135deg, #c9e4ff 0%, #9bc9ff 40%, #5a9ef0 100%);
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 40%, #7dd3fc 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -50,7 +48,7 @@
             overflow-x: hidden;
         }
 
-        /* 动态背景光晕也相应加深 */
+        /* 动态背景光晕 */
         body::before {
             content: '';
             position: fixed;
@@ -58,7 +56,7 @@
             left: -10%;
             width: 60%;
             height: 60%;
-            background: radial-gradient(circle, rgba(43, 110, 215, 0.3) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
             z-index: 0;
             animation: floatBg 20s ease-in-out infinite alternate;
         }
@@ -69,7 +67,7 @@
             right: -10%;
             width: 60%;
             height: 60%;
-            background: radial-gradient(circle, rgba(26, 86, 184, 0.25) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
             z-index: 0;
             animation: floatBg 25s ease-in-out infinite alternate-reverse;
         }
@@ -86,6 +84,7 @@
             height: 85vh;
         }
 
+        /* 毛玻璃卡片容器 */
         .chat-container {
             width: 100%;
             height: 100%;
@@ -101,8 +100,9 @@
             transition: all var(--transition);
         }
 
+        /* 头部：更轻盈的设计 */
         .chat-header {
-            background: rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.3);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             padding: 16px 24px;
@@ -118,14 +118,15 @@
         .chat-header i {
             font-size: 1.7rem;
             color: var(--blue-600);
-            filter: drop-shadow(0 2px 6px rgba(26,86,184,0.4));
+            filter: drop-shadow(0 2px 6px rgba(37,99,235,0.3));
         }
 
+        /* 消息区域：柔和背景 */
         .chat-messages {
             flex: 1;
             padding: 24px 20px 16px;
             overflow-y: auto;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             display: flex;
@@ -134,11 +135,13 @@
             scroll-behavior: smooth;
         }
 
+        /* 自定义滚动条 */
         .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .chat-messages::-webkit-scrollbar-track { background: rgba(255,255,255,0.2); border-radius: 3px; }
         .chat-messages::-webkit-scrollbar-thumb { background: var(--blue-400); border-radius: 3px; }
         .chat-messages::-webkit-scrollbar-thumb:hover { background: var(--blue-500); }
 
+        /* 欢迎界面 */
         .welcome-message {
             text-align: center;
             padding: 40px 20px;
@@ -150,7 +153,7 @@
             color: var(--blue-500);
             margin-bottom: 20px;
             animation: float 3s ease-in-out infinite;
-            filter: drop-shadow(0 10px 15px rgba(26,86,184,0.3));
+            filter: drop-shadow(0 10px 15px rgba(37,99,235,0.2));
         }
         @keyframes float {
             0%, 100% { transform: translateY(0); }
@@ -160,17 +163,18 @@
             font-size: 2rem;
             font-weight: 700;
             margin-bottom: 8px;
-            background: linear-gradient(to right, var(--blue-700), var(--blue-500));
+            background: linear-gradient(to right, var(--blue-600), var(--blue-400));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         .welcome-text {
             font-size: 1rem;
-            color: #334155;
+            color: #475569;
             line-height: 1.6;
         }
 
+        /* 消息气泡过渡动画 */
         .message-list-enter-active {
             transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -198,27 +202,27 @@
             transition: box-shadow 0.2s;
         }
         .message:hover {
-            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.06);
         }
 
         .user-message {
             align-self: flex-end;
-            background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
+            background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
             color: white;
             border-bottom-right-radius: 6px;
-            box-shadow: 0 6px 18px rgba(26,86,184,0.35);
+            box-shadow: 0 6px 18px rgba(37,99,235,0.25);
             margin-left: 15%;
         }
 
         .ai-message {
             align-self: flex-start;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.75);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.75);
+            border: 1px solid rgba(255,255,255,0.7);
             color: #1e293b;
             border-bottom-left-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
             margin-right: 15%;
         }
 
@@ -228,24 +232,25 @@
             line-height: 1.65;
         }
 
+        /* AI 消息的元数据 */
         .sources {
             margin-top: 14px;
             padding-top: 12px;
-            border-top: 1px solid rgba(0,0,0,0.06);
+            border-top: 1px solid rgba(0,0,0,0.05);
             font-size: 0.8rem;
         }
 
         .source-item {
-            background: rgba(255,255,255,0.65);
+            background: rgba(255,255,255,0.6);
             backdrop-filter: blur(4px);
             padding: 10px 14px;
             border-radius: var(--radius-sm);
             margin: 8px 0;
-            border-left: 3px solid var(--blue-600);
+            border-left: 3px solid var(--blue-500);
             transition: all 0.2s;
         }
         .source-item:hover {
-            background: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.8);
             transform: translateX(2px);
         }
         .source-title {
@@ -278,13 +283,14 @@
             font-weight: 600;
             backdrop-filter: blur(4px);
         }
-        .confidence-high { background: rgba(217, 247, 190, 0.75); color: #14532d; }
-        .confidence-medium { background: rgba(254, 243, 199, 0.75); color: #78350f; }
-        .confidence-low { background: rgba(254, 226, 226, 0.75); color: #7f1d1d; }
+        .confidence-high { background: rgba(217, 247, 190, 0.7); color: #166534; }
+        .confidence-medium { background: rgba(254, 243, 199, 0.7); color: #92400e; }
+        .confidence-low { background: rgba(254, 226, 226, 0.7); color: #991b1b; }
 
+        /* 输入区域 */
         .chat-input-area {
             padding: 16px 20px 20px;
-            background: rgba(255,255,255,0.28);
+            background: rgba(255,255,255,0.3);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-top: 1px solid rgba(255,255,255,0.5);
@@ -293,17 +299,17 @@
         .chat-input {
             display: flex;
             gap: 12px;
-            background: rgba(255,255,255,0.75);
+            background: rgba(255,255,255,0.7);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border-radius: 30px;
             padding: 4px 4px 4px 20px;
-            box-shadow: 0 4px 16px rgba(15,35,85,0.12);
-            border: 1px solid rgba(255,255,255,0.65);
+            box-shadow: 0 4px 16px rgba(31,38,135,0.08);
+            border: 1px solid rgba(255,255,255,0.6);
             transition: all var(--transition);
         }
         .chat-input:focus-within {
-            box-shadow: 0 4px 20px rgba(26,86,184,0.3);
+            box-shadow: 0 4px 20px rgba(37,99,235,0.2);
             border-color: var(--blue-300);
         }
 
@@ -318,10 +324,10 @@
             color: #0f172a;
             max-height: 120px;
         }
-        #message-input::placeholder { color: #64748b; }
+        #message-input::placeholder { color: #94a3b8; }
 
         .send-btn {
-            background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
+            background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
             color: white;
             border: none;
             width: 44px;
@@ -333,13 +339,13 @@
             cursor: pointer;
             font-size: 1rem;
             transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(26,86,184,0.4);
+            box-shadow: 0 4px 12px rgba(37,99,235,0.3);
             flex-shrink: 0;
         }
         .send-btn:hover:not(:disabled) {
-            background: linear-gradient(135deg, var(--blue-800), var(--blue-700));
+            background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
             transform: scale(1.08);
-            box-shadow: 0 6px 18px rgba(15,53,133,0.5);
+            box-shadow: 0 6px 18px rgba(37,99,235,0.4);
         }
         .send-btn:disabled {
             opacity: 0.4;
@@ -368,26 +374,28 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* 底部状态栏 */
         .status-bar {
-            background: rgba(255,255,255,0.22);
+            background: rgba(255,255,255,0.25);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             padding: 8px 24px;
             text-align: right;
             font-size: 0.75rem;
-            color: #334155;
+            color: #475569;
             border-top: 1px solid rgba(255,255,255,0.4);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .status-connected { color: #14532d; font-weight: 600; }
-        .status-disconnected { color: #7f1d1d; font-weight: 600; }
+        .status-connected { color: #166534; font-weight: 600; }
+        .status-disconnected { color: #991b1b; font-weight: 600; }
 
+        /* 清除按钮 */
         .clear-btn {
             background: none;
             border: none;
-            color: #475569;
+            color: #64748b;
             cursor: pointer;
             font-size: 0.8rem;
             display: flex;
@@ -398,7 +406,7 @@
             transition: all 0.2s;
         }
         .clear-btn:hover {
-            background: rgba(255,255,255,0.55);
+            background: rgba(255,255,255,0.5);
             color: var(--blue-700);
         }
 
@@ -429,7 +437,7 @@
                         基于 LangChain + LangGraph 构建<br>
                         输入您的问题，即刻获取精准答案
                     </p>
-                    <p class="welcome-text" style="font-size:0.8rem; color:#475569;">
+                    <p class="welcome-text" style="font-size:0.8rem; color:#64748b;">
                         后端地址: <code>http://localhost:8002</code>
                     </p>
                 </div>
