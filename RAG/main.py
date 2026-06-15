@@ -68,10 +68,15 @@ async def lifespan(app: FastAPI):
     # 记录应用正在启动的日志
     logger.info("RAG 问答系统 API 启动中...")
     try:
-        # 在启动时创建 RAGChain 实例，传入配置和持久化目录
         rag_system = RAGChain(config=rag_config, persist_directory=PERSIST_DIRECTORY)
-        # 记录实例创建成功的日志
-        logger.info("RAG 系统实例已创建（未自动索引文档）")
+        
+        # === 新增以下代码 ===
+        logger.info("正在自动加载内置示例文档...")
+        # 从 rag 模块导入的示例文档
+        texts = [doc["text"] for doc in SAMPLE_DOCUMENTS]
+        metadatas = [doc["metadata"] for doc in SAMPLE_DOCUMENTS]
+        rag_system.index_documents(texts, metadatas, collection_name="default")
+        logger.info("示例文档加载完成，系统已就绪！")
     except Exception as e:
         # 如果初始化失败，记录错误日志
         logger.error(f"系统初始化失败: {e}")

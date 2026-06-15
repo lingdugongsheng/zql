@@ -17,7 +17,7 @@ from shared.utils import safe_parse_json
 # 断言该函数是可调用的（确保导入成功且函数存在）
 assert callable(safe_parse_json)
 # 输出成功的提示信息
-print('[OK] shared/utils')
+print('[OK] shared/utils') 
 
 # 以下模块需要 langchain 等依赖，仅在安装 requirements.txt 后才能完整导入
 # 这里只验证它们的编译（语法级别），不真正导入
